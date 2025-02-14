@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Stylish Equation Recognizer &amp; Jiix to LaTeX Converter</title>
+    <!-- Google Fonts -->
+    <link
+      href="https://fonts.googleapis.com/css?family=Montserrat:400,700|Roboto:300,400|Poppins:300,400,600&display=swap"
+      rel="stylesheet"
+    />
+  <style>
+  /* Reset and Global Styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Roboto', sans-serif;
+    /* Updated overall background to a black–blue gradient */
+    background: linear-gradient(135deg, #000000, #004e92);
+    color: #333;
+    min-height: 100vh;
+    position: relative;
+  }
+  /* Header with Animated Gradient and Fixed Position */
+  header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    /* Updated header background to match the new scheme */
+    background: linear-gradient(135deg, #000000, #004e92);
+    padding: 2em 1em;
+    text-align: center;
+    color: #fff;
+    z-index: 1000;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  }
+  header::before {
+    content: "";
+    position: absolute;
+    width: 200%;
+    height: 200%;
+    top: -50%;
+    left: -50%;
+    background: radial-gradient(
+      circle at center,
+      rgba(255, 255, 255, 0.15),
+      transparent 70%
+    );
+    animation: rotate 60s linear infinite;
+  }
+  @keyframes rotate {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  header h1 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 3em;
+    margin-bottom: 0.2em;
+    position: relative;
+    z-index: 1;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+  }
+  header p {
+    font-size: 1.2em;
+    position: relative;
+    z-index: 1;
+  }
+  /* Main Container as Flex Layout with Fade-in Animation */
+  #container {
+    display: flex;
+    gap: 2em;
+    max-width: 1200px;
+    margin: 170px auto 2em auto; /* Top margin accounts for fixed header height */
+    padding: 2em;
+    z-index: 1;
+     }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  /* Panels – Each “card” gets a gradient border stroke */
+  .left-panel,
+  .right-panel {
+    /* Use a transparent border with a gradient via border-image */
+    border: 0px solid transparent;
+    border-image: linear-gradient(45deg, #004e92, #000000) 1;
+    border-radius: 12px;
+    padding: 2em;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.1);
+  }
+  /* Left Panel (Editor, Controls & JSON Output) */
+  .left-panel {
+    flex: 1 1 60%;
+    display: flex;
+    flex-direction: column;
+    background: #fff; /* white background for clarity */
+  }
+  /* Right Panel (LaTeX & Equation Rendering) */
+  .right-panel {
+    flex: 1 1 35%;
+    /* Updated to a black–blue gradient to tie in with the theme */
+    background: linear-gradient(135deg, #0000, #004e92);
+    display: flex;
+    flex-direction: column;
+    gap: 1em;
+  }
+  /* Editor Section */
+  #editor-container {
+    position: relative;
+    height: 400px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 1em;
+  }
+  #editor {
+    width: 100%;
+    height: 100%;
+    background: #fafafa;
+  }
+  /* Navigation Bar */
+  nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5em 0;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 1em;
+  }
+  .button-div {
+    display: flex;
+    gap: 1em;
+  }
+  .nav-btn {
+    /* Updated buttons to use the new gradient */
+    background: linear-gradient(135deg, #000000, #004e92);
+    color: #fff;
+    border: none;
+    padding: 0.8em 1.2em;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+  }
+  .nav-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #000000, #004e92);
+    transform: translateY(-2px);
+  }
+  .nav-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  select {
+    padding: 0.8em;
+    font-size: 1em;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    transition: border 0.3s ease;
+  }
+  select:focus {
+    outline: none;
+    border-color: #004e92;
+  }
+  /* JSON Output Section */
+  #json-output {
+    margin-top: 1em;
+  }
+  #json-output h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.5em;
+    margin-bottom: 0.5em;
+    color: #333;
+  }
+  #result {
+    width: 100%;
+    height: 120px;
+    font-family: 'Courier New', monospace;
+    font-size: 1em;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1em;
+    resize: none;
+    background: #fff;
+    transition: background 0.3s ease;
+  }
+  #result:focus {
+    outline: none;
+    background: #f0f8ff;
+  }
+  #copyBtn {
+    background: linear-gradient(135deg, #000000, #004e92);
+    color: #fff;
+    border: none;
+    padding: 0.8em 1.5em;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+    margin-top: 0.5em;
+  }
+  #copyBtn:hover {
+    background: linear-gradient(135deg, #000000, #004e92);
+    transform: scale(1.02);
+  }
+  /* Right Panel: LaTeX & Rendered Equation Sections */
+  .right-panel section {
+    background: transparent;
+    border: none;
+  }
+  .right-panel h2 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.8em;
+    margin-bottom: 0.5em;
+    color: #fff;
+  }
+  /* Editable LaTeX box styling */
+  #latexOutput {
+    width: 100%;
+    min-height: 80px;
+    font-size: 1.1em;
+    padding: 1em;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    resize: vertical;
+  }
+  /* Copy LaTeX Button Styling */
+  #copyLatexBtn {
+    background: linear-gradient(135deg, #000000, #004e92);
+    color: #fff;
+    border: none;
+    padding: 0.8em 1.5em;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+    margin-top: 0.5em;
+    margin-right: 0.5em;
+  }
+  #copyLatexBtn:hover {
+    background: linear-gradient(135deg, #000000, #004e92);
+    transform: scale(1.02);
+  }
+  /* Download LaTeX Button Styling */
+  #downloadLatexBtn {
+    background: linear-gradient(135deg, #000000, #004e92);
+    color: #fff;
+    border: none;
+    padding: 0.8em 1.5em;
+    border-radius: 8px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+    margin-top: 0.5em;
+  }
+  #downloadLatexBtn:hover {
+    background: linear-gradient(135deg, #000000, #004e92);
+    transform: scale(1.02);
+  }
+  /* Rendered Equation box styling */
+  #renderedEquation {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 8px;
+    padding: 1em;
+    font-size: 1.1em;
+    white-space: pre-wrap;
+    min-height: 200px;
+    color: #333;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  /* Hover effect for the rendered equation box */
+  #renderedEquation:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    transform: scale(1.01);
+  }
+  /* Active button effect */
+  .nav-btn:active,
+  #copyBtn:active,
+  #copyLatexBtn:active,
+  #downloadLatexBtn:active {
+    transform: scale(0.98);
+  }
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
+    #container {
+      flex-direction: column;
+    }
+    .left-panel,
+    .right-panel {
+      flex: 1 1 100%;
+      margin-bottom: 1em;
+    }
+    #editor-container {
+      height: 300px;
+    }
+  }
+</style>
+
+    <!-- Load the MyScript Iink library -->
+    <script type="text/javascript" src="https://unpkg.com/iink-ts/dist/iink.min.js"></script>
+    <!-- MathJax Configuration -->
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']]
+        },
+        svg: { fontCache: 'global' }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  </head>
+  <body>
+    <header>
+      <h1>Equation Recognizer</h1>
+      <p>Handwrite your equation and watch it transform in real time!</p>
+    </header>
+    <div id="container">
+      <!-- Left Panel: Editor, Controls, and JSON Output -->
+      <div class="left-panel">
+        <!-- Editor Section -->
+        <div id="editor-container">
+          <div id="editor" touch-action="none"></div>
+        </div>
+        <!-- Navigation Bar -->
+        <nav>
+          <div class="button-div">
+            <button id="clear" class="nav-btn" disabled>Clear</button>
+            <button id="undo" class="nav-btn" disabled>Undo</button>
+            <button id="redo" class="nav-btn" disabled>Redo</button>
+          </div>
+          <select id="language"></select>
+        </nav>
+        <!-- JSON Output Section -->
+        <section id="json-output">
+          <h2>MyScript JSON Output</h2>
+          <textarea
+            id="result"
+            readonly
+            placeholder="The JSON output from MyScript will appear here..."
+          ></textarea>
+          <button id="copyBtn">Copy Output</button>
+        </section>
+      </div>
+      <!-- Right Panel: LaTeX Output and Rendered Equation -->
+      <div class="right-panel">
+        <section id="latex-section">
+          <h2>LaTeX Output</h2>
+          <!-- Editable LaTeX box -->
+          <textarea id="latexOutput" rows="4" placeholder="LaTeX code will appear here..."></textarea>
+          <div style="display: flex; gap: 0.5em;">
+            <button id="copyLatexBtn">Copy LaTeX</button>
+            <button id="downloadLatexBtn">Download LaTeX</button>
+          </div>
+        </section>
+        <section id="rendered-section">
+          <h2>Rendered Equation</h2>
+          <div id="renderedEquation"></div>
+        </section>
+      </div>
+    </div>
+    <script>
+      // DOM References
+      const editorElement = document.getElementById("editor");
+      const resultElement = document.getElementById("result");
+      const languageElement = document.getElementById("language");
+      const clearElement = document.getElementById("clear");
+      const undoElement = document.getElementById("undo");
+      const redoElement = document.getElementById("redo");
+      const copyBtn = document.getElementById("copyBtn");
+      const copyLatexBtn = document.getElementById("copyLatexBtn");
+      const downloadLatexBtn = document.getElementById("downloadLatexBtn");
+      const latexOutput = document.getElementById("latexOutput");
+      const renderedEquation = document.getElementById("renderedEquation");
+
+      // Debounce timer for export calls
+      let exportTimeout = null;
+
+      // -----------------------------------------------------------
+      // Jiix JSON to LaTeX Conversion Functions
+      // -----------------------------------------------------------
+      function convertNode(node) {
+        if (node && typeof node === "object" && !Array.isArray(node)) {
+          const type = node.type || "";
+          switch (type) {
+            case "Math":
+              const expressions = node.expressions || [];
+              return expressions.map(convertNode).join(" ");
+            case "fraction":
+              const fracOperands = node.operands || [];
+              if (fracOperands.length === 2) {
+                return (
+                  "\\frac{" +
+                  convertNode(fracOperands[0]) +
+                  "}{" +
+                  convertNode(fracOperands[1]) +
+                  "}"
+                );
+              } else {
+                return fracOperands.map(convertNode).join(" ");
+              }
+            case "+":
+            case "-":
+            case "=":
+            case "[":
+            case "]":
+            case "×":
+              const operator = type === "×" ? "\\times" : type;
+              const opOperands = node.operands || [];
+              return opOperands.map(convertNode).join(" " + operator + " ");
+            case "power":
+            case "superscript":
+              const powerOperands = node.operands || [];
+              if (powerOperands.length === 2) {
+                return (
+                  convertNode(powerOperands[0]) +
+                  "^{" +
+                  convertNode(powerOperands[1]) +
+                  "}"
+                );
+              } else {
+                return powerOperands.map(convertNode).join("");
+              }
+            case "subscript":
+              const subOperands = node.operands || [];
+              if (subOperands.length === 2) {
+                return (
+                  convertNode(subOperands[0]) +
+                  "_{" +
+                  convertNode(subOperands[1]) +
+                  "}"
+                );
+              } else {
+                return subOperands.map(convertNode).join("");
+              }
+            case "square root":
+              const sqrtOperands = node.operands || [];
+              if (sqrtOperands.length > 0) {
+                return "\\sqrt{" + convertNode(sqrtOperands[0]) + "}";
+              } else {
+                return "\\sqrt{}";
+              }
+            // If there is a specific node for grouping with braces.
+            case "fence":
+              const braceOperands = node.operands || [];
+              return "(" + braceOperands.map(convertNode).join(" ") + ")";
+            case "number":
+              return node.label || "";
+            case "symbol":
+              return node.label || "";
+            default:
+              if (node.operands) {
+                return node.operands.map(convertNode).join(" ");
+              } else if (node.label) {
+                return node.label;
+              }
+              return "";
+          }
+        } else if (Array.isArray(node)) {
+          return node.map(convertNode).join(" ");
+        } else {
+          return String(node);
+        }
+      }
+
+      function convertJiixToLatex(jsonData) {
+        let root = jsonData;
+        if (typeof jsonData === "string") {
+          try {
+            root = JSON.parse(jsonData);
+          } catch (e) {
+            return "Invalid JSON input.";
+          }
+        }
+        const mimeKey = "application/vnd.myscript.jiix";
+        if (root && typeof root === "object" && root.hasOwnProperty(mimeKey)) {
+          return convertNode(root[mimeKey]);
+        }
+        return convertNode(root);
+      }
+
+      // -----------------------------------------------------------
+      // MyScript Editor Initialization and Event Handling
+      // -----------------------------------------------------------
+      async function loadEditor() {
+        const options = {
+          configuration: {
+            server: {
+              protocol: "WEBSOCKET",
+              scheme: "https",
+              host: "cloud.myscript.com",
+              applicationKey: "072b514f-b9b3-49fa-8d7e-7e15aa8bebe4",
+              hmacKey: "1766422c-3710-405f-a7f3-b01b9bf5df98"
+            },
+            recognition: {
+              type: "MATH"
+            },
+            exportParameters: {
+              mimeTypes: ["application/vnd.myscript.jiix"]
+            }
+          }
+        };
+
+        const editor = new iink.Editor(editorElement, options);
+        await editor.initialize();
+
+        // Populate the language selector.
+        const currentLanguage = editor.configuration.recognition.lang;
+        const availableLanguageResponse = await iink.getAvailableLanguageList(
+          editor.configuration
+        );
+        Object.keys(availableLanguageResponse.result).forEach(function (key) {
+          const selected = currentLanguage === key;
+          languageElement.options[languageElement.options.length] =
+            new Option(
+              availableLanguageResponse.result[key],
+              key,
+              selected,
+              selected
+            );
+        });
+
+        // Listen for changes and trigger export.
+        editor.events.addEventListener("changed", (event) => {
+          undoElement.disabled = !event.detail.canUndo;
+          redoElement.disabled = !event.detail.canRedo;
+          clearElement.disabled = !event.detail.canClear;
+          if (exportTimeout) {
+            clearTimeout(exportTimeout);
+          }
+          exportTimeout = setTimeout(() => {
+            editor.export_();
+          }, 1000);
+        });
+
+        // Process export events.
+        editor.events.addEventListener("exported", (event) => {
+          const jsonOutput = event.detail;
+          resultElement.value = JSON.stringify(jsonOutput, null, 2);
+          const latex = convertJiixToLatex(jsonOutput);
+          // Update the editable LaTeX textarea
+          latexOutput.value = latex;
+          // Render the LaTeX output wrapped in display math delimiters.
+          renderedEquation.innerHTML = `$$${latex}$$`;
+          if (window.MathJax && MathJax.typesetPromise) {
+            MathJax.typesetPromise();
+          }
+        });
+
+        // Control buttons.
+        clearElement.addEventListener("click", async () => {
+          await editor.clear();
+          // Immediately clear the output areas.
+          resultElement.value = "";
+          latexOutput.value = "";
+          renderedEquation.innerHTML = "";
+        });
+        undoElement.addEventListener("click", async () => {
+          await editor.undo();
+        });
+        redoElement.addEventListener("click", async () => {
+          await editor.redo();
+        });
+
+        languageElement.addEventListener("change", (e) => {
+          const configuration = JSON.parse(JSON.stringify(editor.configuration));
+          configuration.recognition.lang = e.target.value;
+          editor.configuration = configuration;
+        });
+
+        window.addEventListener("resize", () => {
+          editor.resize();
+        });
+      }
+
+      loadEditor().catch((error) => console.error(error));
+
+      // -----------------------------------------------------------
+      // Copy JSON Output (using navigator.clipboard if available)
+      // -----------------------------------------------------------
+      copyBtn.addEventListener("click", () => {
+        const text = resultElement.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            copyBtn.textContent = "Copied!";
+            setTimeout(() => (copyBtn.textContent = "Copy Output"), 2000);
+          });
+        } else {
+          resultElement.select();
+          document.execCommand("copy");
+          copyBtn.textContent = "Copied!";
+          setTimeout(() => (copyBtn.textContent = "Copy Output"), 2000);
+        }
+      });
+
+      // -----------------------------------------------------------
+      // Copy LaTeX Output (using navigator.clipboard if available)
+      // -----------------------------------------------------------
+      copyLatexBtn.addEventListener("click", () => {
+        const text = latexOutput.value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            copyLatexBtn.textContent = "Copied!";
+            setTimeout(() => (copyLatexBtn.textContent = "Copy LaTeX"), 2000);
+          });
+        } else {
+          latexOutput.select();
+          document.execCommand("copy");
+          copyLatexBtn.textContent = "Copied!";
+          setTimeout(() => (copyLatexBtn.textContent = "Copy LaTeX"), 2000);
+        }
+      });
+
+      // -----------------------------------------------------------
+      // Download LaTeX Output as a .tex File
+      // -----------------------------------------------------------
+      downloadLatexBtn.addEventListener("click", () => {
+        const latexText = latexOutput.value;
+        const blob = new Blob([latexText], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "equation.tex";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+
+      // -----------------------------------------------------------
+      // Update the Rendered Equation when LaTeX is manually edited.
+      // -----------------------------------------------------------
+      latexOutput.addEventListener("input", () => {
+        const updatedLatex = latexOutput.value;
+        renderedEquation.innerHTML = `$$${updatedLatex}$$`;
+        if (window.MathJax && MathJax.typesetPromise) {
+          MathJax.typesetPromise();
+        }
+      });
+
+      // -----------------------------------------------------------
+      // Keyboard Shortcuts for Undo (Ctrl+Z) and Redo (Ctrl+Y)
+      // -----------------------------------------------------------
+      document.addEventListener("keydown", (e) => {
+        if (e.ctrlKey && e.key.toLowerCase() === "z") {
+          e.preventDefault();
+          if (!undoElement.disabled) {
+            undoElement.click();
+          }
+        } else if (e.ctrlKey && e.key.toLowerCase() === "y") {
+          e.preventDefault();
+          if (!redoElement.disabled) {
+            redoElement.click();
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
