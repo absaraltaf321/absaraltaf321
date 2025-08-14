@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Markdown Reader</title>
+    
+    <!-- CDN Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Source+Serif+Pro:wght@400;600&family=Lora:wght@400;600&family=Roboto:wght@400;500;700&family=Lato:wght@400;700&family=Inconsolata:wght@400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ===== CSS RESET & BASE STYLES ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Light Theme Colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-accent: rgba(255, 255, 255, 0.8);
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.05);
+            --shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.1);
+            --shadow-heavy: 0 16px 48px rgba(0, 0, 0, 0.15);
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --success: #48bb78;
+            --warning: #ed8936;
+            --error: #f56565;
+            
+            /* Typography */
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-serif: 'Crimson Text', Georgia, serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --font-reading: 'Source Serif Pro', Georgia, serif;
+            --font-lora: 'Lora', serif;
+            --font-roboto: 'Roboto', sans-serif;
+            --font-lato: 'Lato', sans-serif;
+            --font-inconsolata: 'Inconsolata', monospace;
+
+            /* Layout */
+            --content-width: 65ch;
+            --reading-width: 75ch;
+            --sidebar-width: 280px;
+            --header-height: 64px;
+            --border-radius: 12px;
+            --border-radius-sm: 6px;
+            --border-radius-lg: 18px;
+            
+            /* Gradients */
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --gradient-4: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            --gradient-5: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            --gradient-6: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            --gradient-7: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); /* Pastel Pink */
+            --gradient-8: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%); /* Pastel Blue */
+            --gradient-9: linear-gradient(135deg, #ff7e5f 0%, #feb47b 100%); /* Sunset */
+            --gradient-10: linear-gradient(135deg, #02aab0 0%, #00cdac 100%); /* Ocean */
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f0f23;
+            --bg-secondary: #1a1a2e;
+            --bg-accent: rgba(26, 26, 46, 0.8);
+            --text-primary: #e2e8f0;
+            --text-secondary: #a0aec0;
+            --text-muted: #718096;
+            --border-color: #2d3748;
+            --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --shadow-medium: 0 8px 24px rgba(0, 0, 0, 0.4);
+            --shadow-heavy: 0 16px 48px rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ===== BACKGROUND GRADIENTS ===== */
+        .bg-gradient-1 { background: var(--gradient-1); }
+        .bg-gradient-2 { background: var(--gradient-2); }
+        .bg-gradient-3 { background: var(--gradient-3); }
+        .bg-gradient-4 { background: var(--gradient-4); }
+        .bg-gradient-5 { background: var(--gradient-5); }
+        .bg-gradient-6 { background: var(--gradient-6); }
+        .bg-gradient-7 { background: var(--gradient-7); }
+        .bg-gradient-8 { background: var(--gradient-8); }
+        .bg-gradient-9 { background: var(--gradient-9); }
+        .bg-gradient-10 { background: var(--gradient-10); }
+
+        .background-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            opacity: 0.1;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: -1;
+        }
+
+        /* ===== HEADER & CONTROLS ===== */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-accent);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            gap: 1rem;
+        }
+        .header.hidden { transform: translateY(-100%); }
+        .logo { font-weight: 700; font-size: 1.25rem; color: var(--accent-primary); white-space: nowrap; }
+
+        .search-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--bg-secondary);
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--border-radius-sm);
+            border: 1px solid var(--border-color);
+            width: 100%;
+            max-width: 400px;
+        }
+        .search-container input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            width: 100%;
+        }
+
+        .menu-container { position: relative; }
+        .menu-toggle-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        .menu-toggle-btn:hover { background: var(--bg-secondary); }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: var(--bg-primary);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-medium);
+            border: 1px solid var(--border-color);
+            width: 250px;
+            z-index: 1100;
+            opacity: 0;
+            transform: translateY(10px);
+            pointer-events: none;
+            transition: all 0.2s ease-out;
+            overflow: hidden;
+        }
+        .dropdown-menu.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+        .dropdown-menu-group { padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); }
+        .dropdown-menu-group:last-child { border-bottom: none; }
+        .dropdown-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            transition: background 0.2s;
+        }
+        .dropdown-menu-item:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .dropdown-menu-item .icon { font-size: 1.2rem; width: 20px; text-align: center; }
+        #fileSelectInMenu { width: 100%; border: none; background: transparent; color: inherit; font-size: inherit; }
+
+        .btn {
+            padding: 0.5rem 1rem; border: none; border-radius: var(--border-radius-sm); background: var(--bg-secondary);
+            color: var(--text-primary); cursor: pointer; font-size: 0.875rem; font-weight: 500;
+            transition: all 0.2s ease; display: flex; align-items: center; gap: 0.5rem;
+        }
+        .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-light); }
+        .btn-primary { background: var(--accent-primary); color: white; }
+
+        /* ===== PROGRESS BAR ===== */
+        .progress-bar {
+            position: fixed; top: var(--header-height); left: 0; height: 3px;
+            background: var(--accent-primary); z-index: 999;
+            transition: width 0.1s ease, opacity 0.3s ease; opacity: 0;
+        }
+        .progress-bar.visible { opacity: 1; }
+
+        /* ===== SIDEBAR & TOC ===== */
+        .sidebar {
+            position: fixed; top: var(--header-height); left: 0; width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height)); background: var(--bg-accent);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color); padding: 1.5rem; overflow-y: auto;
+            transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 900;
+        }
+        .sidebar.open { transform: translateX(0); }
+        .toc-title { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
+        .toc-item { padding: 0.5rem; cursor: pointer; border-left: 3px solid transparent; transition: all 0.2s ease; font-size: 0.875rem; line-height: 1.4; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;}
+        .toc-item:hover { background: var(--bg-secondary); color: var(--text-primary); }
+        .toc-item.active { color: var(--accent-primary); font-weight: 600; border-left-color: var(--accent-primary); }
+        .toc-item.level-2 { padding-left: 1.5rem; }
+        .toc-item.level-3 { padding-left: 2.5rem; }
+        .toc-item.level-4 { padding-left: 3.5rem; }
+
+        /* ===== MAIN CONTENT ===== */
+        .main { margin-left: 0; padding-top: var(--header-height); transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); min-height: 100vh; }
+        .main.sidebar-open { margin-left: var(--sidebar-width); }
+        .content-wrapper { max-width: var(--content-width); margin: 0 auto; padding: 3rem 2rem; position: relative; transition: all 0.3s ease; }
+        .content-wrapper.reading-mode { max-width: var(--reading-width); }
+        .content-wrapper.zen-mode { max-width: var(--reading-width); padding: 6rem 2rem; }
+        
+        /* ===== GLASS MORPHISM ===== */
+        .glass-morphism-active .content-wrapper {
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+            border-radius: var(--border-radius-lg);
+        }
+        [data-theme="dark"].glass-morphism-active .content-wrapper {
+            background: rgba(26, 26, 46, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* ===== MARKDOWN STYLES ===== */
+        .markdown-content { font-size: var(--reading-font-size, 1.125rem); line-height: var(--reading-line-height, 1.8); font-family: var(--reading-font-family, var(--font-reading)); color: var(--text-primary); }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6 { font-family: var(--font-sans); font-weight: 700; margin: 2.5rem 0 1rem 0; line-height: 1.3; color: var(--text-primary); position: relative; scroll-margin-top: calc(var(--header-height) + 1rem); display: flex; align-items: center; gap: 0.5rem;}
+        .markdown-content h1 { font-size: 2.5rem; margin-top: 0; margin-bottom: 2rem; border-bottom: 3px solid var(--accent-primary); padding-bottom: 1rem; }
+        .markdown-content h2 { font-size: 2rem; margin-top: 3rem; border-bottom: 2px solid var(--border-color); padding-bottom: 0.5rem; }
+        .markdown-content h3 { font-size: 1.5rem; }
+        .markdown-content h4 { font-size: 1.25rem; }
+        .markdown-content h2, .markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6 { cursor: pointer; }
+        .markdown-content h2::before, .markdown-content h3::before, .markdown-content h4::before, .markdown-content h5::before, .markdown-content h6::before { content: '▼'; font-size: 0.8em; margin-right: 0.5rem; color: var(--text-muted); transition: transform 0.2s ease; }
+        .markdown-content h2.collapsed::before, .markdown-content h3.collapsed::before, .markdown-content h4.collapsed::before, .markdown-content h5.collapsed::before, .markdown-content h6.collapsed::before { transform: rotate(-90deg); }
+        .markdown-content p { margin: 1.5rem 0; text-align: justify; }
+        .markdown-content blockquote { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary); border-left: 4px solid var(--accent-primary); border-radius: var(--border-radius); font-style: italic; position: relative; }
+        .markdown-content .quote-author { font-style: normal; font-weight: 600; margin-top: 1rem; display: block; text-align: right; color: var(--text-secondary); }
+        .markdown-content ul, .markdown-content ol { margin: 1.5rem 0; padding-left: 2rem; }
+        .markdown-content li { margin: 0.5rem 0; }
+        .markdown-content ul li { list-style: none; position: relative; }
+        .markdown-content ul li::before { content: '•'; color: var(--accent-primary); font-weight: bold; position: absolute; left: -1.5rem; }
+        .markdown-content pre { margin: 2rem 0; background: var(--bg-secondary); border-radius: var(--border-radius); overflow: hidden; position: relative; }
+        .code-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; background: var(--border-color); font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+        .copy-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 0.25rem 0.5rem; border-radius: var(--border-radius-sm); transition: all 0.2s ease; }
+        .copy-btn:hover { background: var(--bg-primary); color: var(--text-primary); }
+        .markdown-content code { font-family: var(--font-mono); font-size: 0.9em; background: var(--bg-secondary); padding: 0.2em 0.4em; border-radius: 3px; }
+        .markdown-content pre code { background: none; padding: 1rem; display: block; overflow-x: auto; }
+        .markdown-content img { max-width: 100%; height: auto; border-radius: var(--border-radius); box-shadow: var(--shadow-medium); margin: 2rem 0; cursor: pointer; transition: transform 0.3s ease; }
+        .markdown-content img:hover { transform: scale(1.02); }
+        .markdown-content table { width: 100%; border-collapse: collapse; margin: 2rem 0; border-radius: var(--border-radius); overflow: hidden; box-shadow: var(--shadow-light); }
+        .markdown-content th, .markdown-content td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .markdown-content th { background: var(--bg-secondary); font-weight: 600; }
+        .markdown-content a { color: var(--accent-primary); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s ease; }
+        .markdown-content a:hover { border-bottom-color: var(--accent-primary); }
+        .markdown-content mark { background-color: var(--accent-primary); color: white; padding: 0.1em; border-radius: 3px; }
+
+        /* ===== FOCUS MODE ===== */
+        .focus-mode .markdown-content > * { opacity: 0.3; transition: opacity 0.3s ease; }
+        .focus-mode .markdown-content > *.focused { opacity: 1; }
+
+        /* ===== ZEN MODE ===== */
+        .zen-mode .header, .zen-mode .sidebar, .zen-mode .floating-section, .zen-mode .reading-stats, .zen-mode .controls-panel { transform: translateY(-200%) translateX(-200%); opacity: 0; pointer-events: none; }
+        .zen-mode .main { margin-left: 0; }
+        .zen-scroll-indicator { position: fixed; right: 1rem; top: 50%; transform: translateY(-50%); width: 3px; height: 200px; background: var(--border-color); border-radius: 2px; opacity: 0; transition: opacity 0.3s ease; }
+        .zen-mode .zen-scroll-indicator { opacity: 0.5; }
+        .zen-scroll-thumb { position: absolute; left: 0; width: 100%; background: var(--accent-primary); border-radius: 2px; transition: all 0.1s ease; }
+
+        /* ===== FLOATING ELEMENTS ===== */
+        .floating-section, .reading-stats { position: fixed; background: var(--bg-accent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: var(--border-radius-lg); box-shadow: var(--shadow-medium); opacity: 0; transform: translateY(20px); transition: all 0.3s ease; z-index: 800; }
+        .floating-section.visible, .reading-stats.visible { opacity: 1; transform: translateY(0); }
+        .floating-section { bottom: 2rem; right: 2rem; padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); }
+        .reading-stats { bottom: 2rem; left: 2rem; padding: 1rem; font-size: 0.875rem; }
+        .reading-stats-item { display: flex; justify-content: space-between; gap: 1rem; margin: 0.25rem 0; }
+
+        /* ===== CONTROLS PANEL ===== */
+        .controls-panel { position: fixed; top: 50%; right: 2rem; transform: translateY(-50%); background: var(--bg-accent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: var(--border-radius-lg); padding: 1rem; box-shadow: var(--shadow-medium); display: flex; flex-direction: column; gap: 0.5rem; opacity: 0; transform: translateY(-50%) translateX(100px); transition: all 0.3s ease; z-index: 800; }
+        .controls-panel.visible { opacity: 1; transform: translateY(-50%) translateX(0); }
+        .control-group { padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); }
+        .control-group:last-child { border-bottom: none; }
+        .control-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block; }
+        .slider { width: 120px; }
+        /* Toggle Switch for Glass Morphism */
+        .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 22px; }
+        .switch-slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .switch-slider { background-color: var(--accent-primary); }
+        input:checked + .switch-slider:before { transform: translateX(18px); }
+
+        /* ===== MODALS & OVERLAYS ===== */
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal.active { opacity: 1; pointer-events: all; }
+        .modal-content { background: var(--bg-primary); border-radius: var(--border-radius-lg); padding: 2rem; max-width: 90vw; max-height: 90vh; overflow: auto; box-shadow: var(--shadow-heavy); transform: scale(0.9); transition: transform 0.3s ease; }
+        .modal.active .modal-content { transform: scale(1); }
+        .lightbox { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.95); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .lightbox.active { opacity: 1; pointer-events: all; }
+        .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--border-radius); }
+        .lightbox-close { position: absolute; top: 2rem; right: 2rem; background: rgba(255, 255, 255, 0.2); border: none; color: white; width: 3rem; height: 3rem; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; transition: background 0.2s ease; }
+        .lightbox-close:hover { background: rgba(255, 255, 255, 0.3); }
+
+        /* ===== DRAG & DROP ===== */
+        .drop-zone { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(102, 126, 234, 0.1); border: 3px dashed var(--accent-primary); display: flex; align-items: center; justify-content: center; z-index: 1500; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .drop-zone.active { opacity: 1; pointer-events: all; }
+        .drop-message { background: var(--bg-primary); padding: 2rem 3rem; border-radius: var(--border-radius-lg); box-shadow: var(--shadow-heavy); text-align: center; font-size: 1.25rem; font-weight: 600; color: var(--accent-primary); }
+
+        /* ===== INITIAL VIEW ===== */
+        .initial-view .header,
+        .initial-view .sidebar,
+        .initial-view .progress-bar,
+        .initial-view .floating-section,
+        .initial-view .reading-stats,
+        .initial-view .controls-panel {
+            display: none;
+        }
+
+        .initial-view .main {
+            padding-top: 0;
+            margin-left: 0;
+        }
+
+        .initial-view #contentWrapper {
+            max-width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .initial-view .markdown-content {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .upload-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem 4rem;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius-lg);
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .upload-box:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-medium);
+            border-color: var(--accent-primary);
+            background: var(--bg-primary);
+        }
+
+        .upload-box .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--accent-primary);
+        }
+
+        .upload-box .upload-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-box .upload-subtext {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+        
+        /* ===== FEATURE-SPECIFIC STYLES ===== */
+        .bookmark-icon {
+            cursor: pointer;
+            font-size: 1rem;
+            opacity: 0.5;
+            transition: all 0.2s ease;
+        }
+        .bookmark-icon:hover {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+        .bookmark-icon.bookmarked {
+            opacity: 1;
+            color: var(--warning);
+        }
+        #search-results-list .result-item {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            cursor: pointer;
+        }
+        #search-results-list .result-item:hover {
+            background: var(--bg-secondary);
+        }
+        #search-results-list .result-item:last-child {
+            border-bottom: none;
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 1024px) {
+            .main.sidebar-open {
+                margin-left: 0;
+            }
+            .sidebar {
+                transform: translateX(-100%);
+                box-shadow: var(--shadow-heavy);
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            :root { 
+                --header-height: auto; 
+                --content-width: 100%;
+                --reading-width: 100%;
+            }
+            .header { 
+                padding: 0.5rem 1rem; 
+                flex-wrap: wrap; 
+                height: auto; 
+                justify-content: space-between;
+                align-items: center;
+            }
+            .logo { 
+                font-size: 1.1rem; 
+                order: 1;
+            }
+            #sidebarToggleBtn { 
+                display: block;
+                order: 2;
+            }
+            .search-container { 
+                order: 4; 
+                width: 100%; 
+                margin: 0.5rem 0 0;
+            }
+            .menu-container {
+                display: flex;
+                order: 3;
+            }
+            .content-wrapper { 
+                padding: 1.5rem 1rem; 
+            }
+            .controls-panel { 
+                bottom: 1rem; 
+                right: 1rem; 
+                top: auto; 
+                transform: none; 
+                opacity: 0; 
+                transform: translateY(100px); 
+            }
+            .controls-panel.visible { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+            .floating-section, .reading-stats { 
+                display: none; 
+            }
+            .upload-box {
+                padding: 2rem;
+            }
+            .upload-text {
+                font-size: 1.1rem;
+            }
+            .upload-subtext {
+                font-size: 0.8rem;
+            }
+            .markdown-content {
+                font-size: 1rem;
+                line-height: 1.7;
+            }
+            .markdown-content h1 { font-size: 2rem; }
+            .markdown-content h2 { font-size: 1.75rem; }
+            .markdown-content h3 { font-size: 1.375rem; }
+        }
+
+        /* ===== ANIMATIONS ===== */
+        .fade-in { animation: fadeIn 0.6s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .section-fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
+        .section-fade-in.visible { opacity: 1; transform: translateY(0); }
+
+        /* ===== PRINT STYLES ===== */
+        @media print {
+            .header, .sidebar, .controls-panel, .floating-section, .reading-stats, .zen-scroll-indicator, .bookmark-icon { display: none !important; }
+            .main { margin-left: 0 !important; padding-top: 0 !important; }
+            .content-wrapper { max-width: none !important; padding: 0 !important; box-shadow: none !important; border: none !important;}
+            .markdown-content { font-size: 12pt; line-height: 1.5; color: black; }
+            .markdown-content h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }
+            .markdown-content pre, blockquote { page-break-inside: avoid; }
+            .markdown-content a { color: #000 !important; text-decoration: none !important; }
+        }
+    </style>
+</head>
+<body data-theme="dark" class="initial-view">
+    <!-- Background Overlay -->
+    <div class="background-overlay bg-gradient-1"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="logo">📖 Premium Reader</div>
+        <button class="menu-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar" style="display: none;">☰</button>
+        <div class="search-container" id="searchContainer" style="display: none;">
+            <span>🔍</span>
+            <input type="search" id="searchInput" placeholder="Search in document...">
+        </div>
+        <div class="menu-container">
+            <button class="menu-toggle-btn" id="menuToggleBtn" title="Menu">☰</button>
+            <div class="dropdown-menu" id="dropdownMenu">
+                <div class="dropdown-menu-group">
+                    <div class="dropdown-menu-item" id="uploadBtn">
+                        <span class="icon">📁</span>
+                        <span>Upload File</span>
+                    </div>
+                    <div class="dropdown-menu-item" id="recentFilesItem">
+                         <span class="icon">📄</span>
+                         <select id="fileSelectInMenu" title="Select from recent files">
+                             <option value="">Recent files...</option>
+                         </select>
+                    </div>
+                </div>
+                <div class="dropdown-menu-group">
+                    <div class="dropdown-menu-item" id="toggleSidebar">
+                        <span class="icon">📋</span>
+                        <span>Table of Contents (T)</span>
+                    </div>
+                    <div class="dropdown-menu-item" id="toggleFocus">
+                        <span class="icon">🎯</span>
+                        <span>Focus Mode (F)</span>
+                    </div>
+                    <div class="dropdown-menu-item" id="toggleZen">
+                        <span class="icon">🧘</span>
+                        <span>Zen Mode (Z)</span>
+                    </div>
+                </div>
+                <div class="dropdown-menu-group">
+                     <div class="dropdown-menu-item" id="printBtn">
+                        <span class="icon">🖨️</span>
+                        <span>Print</span>
+                    </div>
+                    <div class="dropdown-menu-item" id="exportPdfBtn">
+                        <span class="icon">📄</span>
+                        <span>Export as PDF</span>
+                    </div>
+                </div>
+                <div class="dropdown-menu-group">
+                     <div class="dropdown-menu-item" id="toggleTheme">
+                        <span class="icon">🌙</span>
+                        <span>Toggle Theme</span>
+                    </div>
+                    <div class="dropdown-menu-item" id="toggleControls">
+                        <span class="icon">⚙️</span>
+                        <span>Display Settings</span>
+                    </div>
+                </div>
+                <div class="dropdown-menu-group">
+                    <div class="dropdown-menu-item" id="clearRecentsBtn" style="color: var(--error);">
+                       <span class="icon">🗑️</span>
+                       <span>Clear Recent Files</span>
+                   </div>
+               </div>
+            </div>
+        </div>
+        <input type="file" id="fileInput" accept=".md,.txt" style="display: none;" multiple>
+    </header>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <!-- TOC and Bookmarks will be injected here -->
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main" id="main">
+        <div class="content-wrapper" id="contentWrapper">
+            <div class="markdown-content" id="markdownContent">
+                <!-- Initial Upload Box -->
+                <div class="upload-box" id="mainUploadBox">
+                    <span class="upload-icon">📁</span>
+                    <span class="upload-text">Upload Document</span>
+                    <p class="upload-subtext">or drag and drop a file</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating Elements -->
+    <div class="floating-section" id="floatingSection"></div>
+    <div class="reading-stats" id="readingStats">
+        <div class="reading-stats-item">
+            <span>Reading Time:</span>
+            <span id="estimatedTime">--</span>
+        </div>
+        <div class="reading-stats-item">
+            <span>Words:</span>
+            <span id="wordCount">--</span>
+        </div>
+        <div class="reading-stats-item">
+            <span>Progress:</span>
+            <span id="readingProgress">0%</span>
+        </div>
+    </div>
+
+    <!-- Controls Panel -->
+    <div class="controls-panel" id="controlsPanel">
+        <div class="control-group">
+            <div class="control-label">Font Size</div>
+            <input type="range" class="slider" id="fontSizeSlider" min="14" max="24" value="18" step="1">
+        </div>
+        <div class="control-group">
+            <div class="control-label">Line Height</div>
+            <input type="range" class="slider" id="lineHeightSlider" min="1.4" max="2.2" value="1.8" step="0.1">
+        </div>
+        <div class="control-group">
+            <div class="control-label">Content Width</div>
+            <input type="range" class="slider" id="contentWidthSlider" min="45" max="85" value="65" step="5">
+        </div>
+        <div class="control-group">
+            <div class="control-label">Background</div>
+            <select id="backgroundSelect" class="btn" style="width: 100%; margin: 0;">
+                <option value="1">Purple Blue</option>
+                <option value="2">Pink Red</option>
+                <option value="3">Blue Cyan</option>
+                <option value="4">Green Cyan</option>
+                <option value="5">Pink Yellow</option>
+                <option value="6">Mint Pink</option>
+                <option value="7">Pastel Pink</option>
+                <option value="8">Pastel Blue</option>
+                <option value="9">Sunset</option>
+                <option value="10">Ocean</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <div class="control-label">Font Family</div>
+            <select id="fontFamilySelect" class="btn" style="width: 100%; margin: 0;">
+                <option value="serif">Serif (Reading)</option>
+                <option value="sans">Sans-serif (Modern)</option>
+                <option value="lora">Lora (Elegant Serif)</option>
+                <option value="roboto">Roboto (UI Sans)</option>
+                <option value="lato">Lato (Friendly Sans)</option>
+                <option value="mono">Monospace (Code)</option>
+                <option value="inconsolata">Inconsolata (Code)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <div class="control-label" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Glass Effect</span>
+                <label class="switch">
+                    <input type="checkbox" id="glassMorphismToggle">
+                    <span class="switch-slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zen Mode Scroll Indicator -->
+    <div class="zen-scroll-indicator" id="zenScrollIndicator">
+        <div class="zen-scroll-thumb" id="zenScrollThumb"></div>
+    </div>
+
+    <!-- Image Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="app.closeLightbox()">
+        <button class="lightbox-close" onclick="app.closeLightbox()">×</button>
+        <img id="lightboxImage" src="" alt="Enlarged view">
+    </div>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+        <div class="drop-message">📁 Drop your Markdown files here</div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal" id="appModal">
+        <div class="modal-content">
+            <h2 id="modalTitle"></h2>
+            <div id="modalBody" style="margin: 1rem 0;"></div>
+            <button class="btn btn-primary" onclick="closeModal('appModal')" style="float: right;">Close</button>
+        </div>
+    </div>
+    
+    <script>
+        // ===== DEBOUNCE UTILITY =====
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // ===== GLOBAL HELPER FUNCTIONS =====
+        function copyCode(button) {
+            const pre = button.closest('pre');
+            const code = pre.querySelector('code');
+            const text = code.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                button.style.color = 'var(--success)';
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.color = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy code: ', err);
+            });
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+
+        // ===== APPLICATION CLASS =====
+        class MarkdownReader {
+            constructor() {
+                this.state = {
+                    currentFile: null,
+                    files: new Map(),
+                    settings: this.loadSettings(),
+                    readingPositions: this.loadJSON("readingPositions", {}),
+                    bookmarks: this.loadJSON("bookmarks", {}),
+                    isLoading: false,
+                    currentSection: null,
+                    focusMode: false,
+                    zenMode: false,
+                    sidebarOpen: false,
+                    controlsVisible: false,
+                    menuVisible: false,
+                    lastScrollY: 0
+                };
+                this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+
+                this.elements = this.initializeElements();
+                this.init();
+            }
+
+            // ===== INITIALIZATION =====
+            initializeElements() {
+                const ids = [
+                    'fileInput', 'markdownContent', 'progressBar', 'sidebar', 'main', 
+                    'contentWrapper', 'floatingSection', 'readingStats', 
+                    'controlsPanel', 'lightbox', 'dropZone', 'zenScrollIndicator', 
+                    'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn', 
+                    'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'appModal',
+                    'modalTitle', 'modalBody', 'searchInput', 'searchContainer',
+                    'printBtn', 'exportPdfBtn', 'clearRecentsBtn', 'sidebarToggleBtn'
+                ];
+                const elements = {};
+                ids.forEach(id => elements[id] = document.getElementById(id));
+                elements.backgroundOverlay = document.querySelector('.background-overlay');
+                elements.header = document.querySelector('.header');
+                return elements;
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.applySettings();
+                this.loadFilesFromStorage();
+                this.updateFileSelect();
+                this.setupCustomRenderer();
+            }
+
+            setupCustomRenderer() {
+                const renderer = new marked.Renderer();
+                const originalHeading = renderer.heading.bind(renderer);
+
+                renderer.code = (code, lang) => {
+                    const codeToHighlight = String(code || '');
+                    const language = lang || 'text';
+                    const highlighted = hljs.getLanguage(lang) 
+                        ? hljs.highlight(codeToHighlight, { language, ignoreIllegals: true }).value
+                        : hljs.highlightAuto(codeToHighlight).value;
+
+                    return `<pre><div class="code-header"><span>${language}</span><button class="copy-btn" onclick="copyCode(this)" title="Copy code">📋 Copy</button></div><code class="hljs ${language}">${highlighted}</code></pre>`;
+                };
+
+                renderer.image = (href, title, text) => {
+                    return `<img src="${href}" alt="${text}" title="${title || ''}" onclick="app.openLightbox('${href}', '${text}')" loading="lazy">`;
+                };
+                
+                renderer.blockquote = (quote) => {
+                    const authorMatch = quote.match(/<p>—(.*?)<\/p>\s*$/);
+                    if (authorMatch) {
+                        const content = quote.replace(authorMatch[0], '');
+                        const author = authorMatch[1].trim();
+                        return `<blockquote>${content}<p class="quote-author">— ${author}</p></blockquote>`;
+                    }
+                    return `<blockquote>${quote}</blockquote>`;
+                };
+
+                renderer.heading = (text, level, raw) => {
+                    const anchor = String(raw || '').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-');
+                    const bookmarkIcon = `<span class="bookmark-icon" onclick="app.toggleBookmark('${anchor}', event)" title="Bookmark section">☆</span>`;
+                    // Use the original renderer to get the basic h-tag, then inject our icon.
+                    const headingHtml = originalHeading(text, level, raw, marked);
+                    return headingHtml.replace(`id="${anchor}"`, `id="${anchor}">${bookmarkIcon}`);
+                };
+
+                marked.setOptions({ renderer, breaks: true, gfm: true });
+            }
+
+            // ===== EVENT LISTENERS =====
+            setupEventListeners() {
+                this.elements.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                this.elements.uploadBtn.addEventListener('click', () => this.elements.fileInput.click());
+                this.elements.fileSelectInMenu.addEventListener('change', (e) => this.loadFile(e.target.value));
+
+                if (this.elements.mainUploadBox) {
+                    this.elements.mainUploadBox.addEventListener('click', () => this.elements.fileInput.click());
+                }
+
+                this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
+                this.elements.sidebarToggleBtn.addEventListener('click', () => this.toggleSidebar());
+                this.elements.searchInput.addEventListener('input', debounce(e => this.searchInDocument(e.target.value), 300));
+
+                // Menu items
+                document.getElementById('toggleTheme').addEventListener('click', () => this.toggleTheme());
+                document.getElementById('toggleSidebar').addEventListener('click', () => this.toggleSidebar());
+                document.getElementById('toggleFocus').addEventListener('click', () => this.toggleFocusMode());
+                document.getElementById('toggleZen').addEventListener('click', () => this.toggleZenMode());
+                document.getElementById('toggleControls').addEventListener('click', () => this.toggleControls());
+                this.elements.printBtn.addEventListener('click', () => window.print());
+                this.elements.exportPdfBtn.addEventListener('click', () => this.exportToPdf());
+                this.elements.clearRecentsBtn.addEventListener('click', () => this.clearRecentFiles());
+                
+                // Controls Panel
+                document.getElementById('fontSizeSlider').addEventListener('input', (e) => this.updateSetting('fontSize', e.target.value));
+                document.getElementById('lineHeightSlider').addEventListener('input', (e) => this.updateSetting('lineHeight', e.target.value));
+                document.getElementById('contentWidthSlider').addEventListener('input', (e) => this.updateSetting('contentWidth', e.target.value));
+                document.getElementById('backgroundSelect').addEventListener('change', (e) => this.updateSetting('background', e.target.value));
+                document.getElementById('fontFamilySelect').addEventListener('change', (e) => this.updateSetting('fontFamily', e.target.value));
+                document.getElementById('glassMorphismToggle').addEventListener('change', (e) => this.updateSetting('glassMorphism', e.target.checked));
+
+                const debouncedScroll = debounce(() => {
+                    this.updateProgress();
+                    this.updateCurrentSection();
+                    this.updateZenScrollIndicator();
+                    this.saveReadingPosition();
+                    
+                    if (!this.state.zenMode) {
+                        this.elements.header.classList.toggle('hidden', window.scrollY > this.state.lastScrollY && window.scrollY > 100);
+                        this.state.lastScrollY = window.scrollY;
+                    }
+                }, 100);
+                window.addEventListener('scroll', debouncedScroll, { passive: true });
+
+                document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+
+                ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                    document.addEventListener(eventName, e => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    });
+                });
+                ['dragenter', 'dragover'].forEach(eventName => {
+                    document.addEventListener(eventName, () => this.elements.dropZone.classList.add('active'));
+                });
+                ['dragleave', 'drop'].forEach(eventName => {
+                    document.addEventListener(eventName, () => this.elements.dropZone.classList.remove('active'));
+                });
+                document.addEventListener('drop', (e) => this.handleDrop(e));
+
+                document.addEventListener('click', (e) => {
+                    if (!this.elements.controlsPanel.contains(e.target) && !e.target.closest('#toggleControls')) {
+                        this.hideControls();
+                    }
+                    if (!this.elements.menuToggleBtn.contains(e.target) && !this.elements.dropdownMenu.contains(e.target)) {
+                        this.hideMenu();
+                    }
+                    if (this.state.sidebarOpen && !this.elements.sidebar.contains(e.target) && !this.elements.sidebarToggleBtn.contains(e.target)) {
+                        this.toggleSidebar();
+                    }
+                });
+            }
+
+            // ===== FILE HANDLING =====
+            async handleFileSelect(event) {
+                await this.processFiles(Array.from(event.target.files));
+            }
+
+            async handleDrop(event) {
+                const files = Array.from(event.dataTransfer.files).filter(file => 
+                    file.type === 'text/markdown' || file.name.endsWith('.md') || file.name.endsWith('.txt')
+                );
+                if (files.length === 0) {
+                    this.showError('Please drop Markdown (.md) or text (.txt) files.');
+                    return;
+                }
+                await this.processFiles(files);
+            }
+            
+            async processFiles(files) {
+                if (files.length === 0) return;
+                
+                const validFiles = files.filter(file => {
+                    if (file.size > this.MAX_FILE_SIZE) {
+                        this.showError(`File "${file.name}" is too large (max 5MB).`);
+                        return false;
+                    }
+                    return true;
+                });
+
+                if (validFiles.length === 0) return;
+
+                this.showLoading();
+                
+                try {
+                    const readPromises = validFiles.map(file => this.readFile(file));
+                    await Promise.all(readPromises);
+                    
+                    this.updateFileSelect();
+                    this.saveFilesToStorage();
+                    await this.loadFile(validFiles[0].name);
+                } catch (error) {
+                    this.showError('Failed to process files: ' + error.message);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            readFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.state.files.set(file.name, {
+                            name: file.name,
+                            content: e.target.result
+                        });
+                        resolve();
+                    };
+                    reader.onerror = () => reject(new Error('Failed to read file: ' + file.name));
+                    reader.readAsText(file);
+                });
+            }
+
+            async loadFile(filename) {
+                if (!filename || !this.state.files.has(filename)) return;
+
+                document.body.classList.remove('initial-view');
+                this.elements.searchContainer.style.display = 'flex';
+
+                this.state.currentFile = filename;
+                const file = this.state.files.get(filename);
+                
+                try {
+                    const contentToParse = String(file.content || '');
+                    const html = await marked.parse(contentToParse);
+                    
+                    this.elements.markdownContent.innerHTML = html;
+                    this.elements.markdownContent.classList.remove('fade-in');
+                    void this.elements.markdownContent.offsetWidth; // Trigger reflow
+                    this.elements.markdownContent.classList.add('fade-in');
+                    
+                    this.generateSidebarContent();
+                    this.updateReadingStats();
+                    this.setupContentObservers();
+                    
+                    this.loadReadingPosition(); // This will scroll to the saved position
+                    
+                    this.elements.readingStats.classList.add('visible');
+                    this.elements.progressBar.classList.add('visible');
+                    this.elements.fileSelectInMenu.value = filename;
+
+                } catch (error) {
+                    console.error("Markdown Parsing Error:", error);
+                    this.showError('Failed to render markdown. The file might be corrupted or contain unsupported syntax.');
+                }
+            }
+
+            // ===== CONTENT PROCESSING & OBSERVERS =====
+            generateSidebarContent() {
+                this.elements.sidebar.innerHTML = ''; // Clear previous content
+
+                const fileBookmarks = this.state.bookmarks[this.state.currentFile] || [];
+                const headings = this.elements.markdownContent.querySelectorAll('h1, h2, h3, h4');
+
+                // Bookmarks Section
+                if (fileBookmarks.length > 0) {
+                    const bookmarksTitle = document.createElement('div');
+                    bookmarksTitle.className = 'toc-title';
+                    bookmarksTitle.textContent = 'Bookmarks';
+                    this.elements.sidebar.appendChild(bookmarksTitle);
+
+                    fileBookmarks.forEach(bookmarkId => {
+                        const heading = document.getElementById(bookmarkId);
+                        if(heading) {
+                            const bookmarkItem = document.createElement('div');
+                            bookmarkItem.className = 'toc-item';
+                            bookmarkItem.innerHTML = `<span>${heading.textContent}</span>`;
+                            bookmarkItem.onclick = () => {
+                                heading.scrollIntoView({ behavior: 'smooth' });
+                                if (this.state.sidebarOpen) this.toggleSidebar();
+                            };
+                            this.elements.sidebar.appendChild(bookmarkItem);
+                        }
+                    });
+                }
+                
+                // TOC Section
+                if (headings.length > 0) {
+                    const tocTitle = document.createElement('div');
+                    tocTitle.className = 'toc-title';
+                    tocTitle.textContent = 'Table of Contents';
+                    this.elements.sidebar.appendChild(tocTitle);
+                    
+                    headings.forEach(heading => {
+                        const level = parseInt(heading.tagName.charAt(1));
+                        const text = heading.textContent;
+                        const id = heading.id;
+
+                        const tocItem = document.createElement('div');
+                        tocItem.className = `toc-item level-${level}`;
+                        tocItem.textContent = text;
+                        tocItem.dataset.target = id;
+                        tocItem.onclick = () => {
+                            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+                            if (this.state.sidebarOpen) this.toggleSidebar();
+                        };
+                        this.elements.sidebar.appendChild(tocItem);
+                    });
+                }
+
+                this.updateBookmarkIcons();
+            }
+
+            setupContentObservers() {
+                if (this.intersectionObserver) this.intersectionObserver.disconnect();
+                if (this.focusObserver) this.focusObserver.disconnect();
+
+                this.intersectionObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        entry.target.classList.toggle('visible', entry.isIntersecting);
+                    });
+                }, { rootMargin: '0px 0px -20% 0px' });
+
+                this.focusObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        entry.target.classList.toggle('focused', entry.isIntersecting);
+                    });
+                }, { rootMargin: '-40% 0px -40% 0px', threshold: 0.1 });
+
+                const elements = this.elements.markdownContent.querySelectorAll('p, blockquote, pre, ul, ol, table, h1, h2, h3, h4, h5, h6');
+                elements.forEach(el => {
+                    el.classList.add('section-fade-in');
+                    this.intersectionObserver.observe(el);
+                    if (this.state.focusMode) {
+                        this.focusObserver.observe(el);
+                    }
+                });
+                
+                this.setupCollapsibleSections();
+            }
+            
+            setupCollapsibleSections() {
+                const headings = this.elements.markdownContent.querySelectorAll('h2, h3, h4, h5, h6');
+                headings.forEach(heading => {
+                    heading.onclick = (e) => {
+                        if (e.target.classList.contains('bookmark-icon') || e.target.tagName === 'A') return;
+                        this.toggleSection(heading);
+                    };
+                });
+            }
+
+            // ===== UI CONTROLS & MODES =====
+            toggleMenu() {
+                this.state.menuVisible = !this.state.menuVisible;
+                this.elements.dropdownMenu.classList.toggle('visible', this.state.menuVisible);
+            }
+            hideMenu() {
+                if (this.state.menuVisible) {
+                    this.state.menuVisible = false;
+                    this.elements.dropdownMenu.classList.remove('visible');
+                }
+            }
+
+            toggleTheme() {
+                const newTheme = document.body.dataset.theme === 'light' ? 'dark' : 'light';
+                document.getElementById('toggleTheme').querySelector('.icon').textContent = newTheme === 'light' ? '🌙' : '☀️';
+                this.updateSetting('theme', newTheme);
+            }
+
+            toggleSidebar() {
+                this.state.sidebarOpen = !this.state.sidebarOpen;
+                this.elements.sidebar.classList.toggle('open', this.state.sidebarOpen);
+                this.elements.main.classList.toggle('sidebar-open', this.state.sidebarOpen);
+                this.hideMenu();
+            }
+
+            toggleFocusMode() {
+                this.state.focusMode = !this.state.focusMode;
+                document.body.classList.toggle('focus-mode', this.state.focusMode);
+                this.setupContentObservers(); // Re-attach observers
+                document.getElementById('toggleFocus').style.background = this.state.focusMode ? 'var(--accent-primary)' : '';
+                document.getElementById('toggleFocus').style.color = this.state.focusMode ? 'white' : '';
+                this.hideMenu();
+            }
+
+            toggleZenMode() {
+                this.state.zenMode = !this.state.zenMode;
+                document.body.classList.toggle('zen-mode', this.state.zenMode);
+                this.elements.contentWrapper.classList.toggle('zen-mode', this.state.zenMode);
+                document.getElementById('toggleZen').style.background = this.state.zenMode ? 'var(--accent-primary)' : '';
+                document.getElementById('toggleZen').style.color = this.state.zenMode ? 'white' : '';
+                this.hideMenu();
+            }
+
+            toggleControls() {
+                this.state.controlsVisible = !this.state.controlsVisible;
+                this.elements.controlsPanel.classList.toggle('visible', this.state.controlsVisible);
+                this.hideMenu();
+            }
+            
+            hideControls() {
+                this.state.controlsVisible = false;
+                this.elements.controlsPanel.classList.remove('visible');
+            }
+
+            // ===== READING FEATURES =====
+            updateProgress() {
+                const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+                if (scrollableHeight <= 0) {
+                    this.elements.progressBar.style.width = '0%';
+                    document.getElementById('readingProgress').textContent = '100%';
+                    return;
+                }
+                const progress = (window.scrollY / scrollableHeight) * 100;
+                this.elements.progressBar.style.width = `${Math.min(progress, 100)}%`;
+                document.getElementById('readingProgress').textContent = `${Math.round(progress)}%`;
+            }
+
+            updateCurrentSection() {
+                const headings = this.elements.markdownContent.querySelectorAll('h1, h2, h3, h4');
+                let current = null;
+                for (const heading of headings) {
+                    if (heading.getBoundingClientRect().top <= this.elements.header.clientHeight + 20) {
+                        current = heading;
+                    } else {
+                        break;
+                    }
+                }
+                
+                if (current && current !== this.state.currentSection) {
+                    this.state.currentSection = current;
+                    this.elements.floatingSection.textContent = current.textContent;
+                    this.elements.floatingSection.classList.add('visible');
+                    
+                    this.elements.sidebar.querySelectorAll('.toc-item').forEach(item => {
+                        item.classList.toggle('active', item.dataset.target === current.id);
+                    });
+                }
+            }
+
+            updateZenScrollIndicator() {
+                if (!this.state.zenMode) return;
+                const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
+                const progress = (window.scrollY / scrollableHeight) * 100;
+                const thumb = this.elements.zenScrollThumb;
+                const indicator = this.elements.zenScrollIndicator;
+                const thumbHeight = 40;
+                const maxTop = indicator.offsetHeight - thumbHeight;
+                thumb.style.height = `${thumbHeight}px`;
+                thumb.style.top = `${(progress / 100) * maxTop}px`;
+            }
+
+            updateReadingStats() {
+                if (!this.state.currentFile) return;
+                const text = this.elements.markdownContent.textContent;
+                const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+                const estimatedMinutes = Math.ceil(wordCount / 200); // 200 WPM
+                
+                document.getElementById('wordCount').textContent = wordCount.toLocaleString();
+                document.getElementById('estimatedTime').textContent = `${estimatedMinutes} min`;
+            }
+
+            // ===== KEYBOARD SHORTCUTS =====
+            handleKeyboardShortcuts(event) {
+                if (event.target.matches('input, textarea, select')) return;
+                
+                const keyMap = {
+                    't': () => this.toggleSidebar(),
+                    'f': () => this.toggleFocusMode(),
+                    'z': () => this.toggleZenMode(),
+                    'Escape': () => {
+                        if (this.state.zenMode) this.toggleZenMode();
+                        if (this.state.menuVisible) this.hideMenu();
+                        if (this.state.controlsVisible) this.hideControls();
+                        if(document.getElementById('appModal').classList.contains('active')) closeModal('appModal');
+                    },
+                };
+
+                if (keyMap[event.key]) {
+                    event.preventDefault();
+                    keyMap[event.key]();
+                }
+            }
+            
+            // ===== ADVANCED FEATURES =====
+            toggleSection(heading) {
+                heading.classList.toggle('collapsed');
+                const isCollapsed = heading.classList.contains('collapsed');
+                let nextElement = heading.nextElementSibling;
+                const level = parseInt(heading.tagName.charAt(1));
+
+                while (nextElement) {
+                    if (nextElement.matches('h1, h2, h3, h4, h5, h6')) {
+                        const nextLevel = parseInt(nextElement.tagName.charAt(1));
+                        if (nextLevel <= level) break;
+                    }
+                    nextElement.style.display = isCollapsed ? 'none' : '';
+                    nextElement = nextElement.nextElementSibling;
+                }
+            }
+
+            openLightbox(src, alt) {
+                const image = document.getElementById('lightboxImage');
+                image.src = src;
+                image.alt = alt;
+                this.elements.lightbox.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+
+            closeLightbox() {
+                this.elements.lightbox.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+
+            searchInDocument(query) {
+                const content = this.elements.markdownContent;
+                // Simple search for now: find paragraphs containing the text.
+                // A more advanced implementation would use a proper highlighting library.
+                const paragraphs = content.querySelectorAll('p, li');
+                const results = [];
+                if (query.trim().length < 2) {
+                    this.showModal("Search", "<p>Please enter at least 2 characters to search.</p>");
+                    return;
+                };
+
+                paragraphs.forEach((p, index) => {
+                    if (p.textContent.toLowerCase().includes(query.toLowerCase())) {
+                        p.id = p.id || `search-result-${index}`;
+                        results.push({
+                            id: p.id,
+                            text: p.textContent.substring(0, 100) + '...'
+                        });
+                    }
+                });
+
+                if (results.length > 0) {
+                    const resultsHtml = results.map(r => `<div class="result-item" onclick="app.scrollToElement('${r.id}')">${r.text}</div>`).join('');
+                    this.showModal("Search Results", `<div id="search-results-list">${resultsHtml}</div>`);
+                } else {
+                    this.showModal("Search Results", "<p>No results found.</p>");
+                }
+            }
+
+            scrollToElement(id) {
+                document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                closeModal('appModal');
+            }
+
+            exportToPdf() {
+                const { jsPDF } = window.jspdf;
+                const content = this.elements.markdownContent;
+                this.showModal("Exporting PDF", "<p>Please wait while the PDF is being generated...</p>");
+
+                html2canvas(content, {
+                    scale: 2, // Higher scale for better quality
+                    useCORS: true,
+                    backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim()
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'pt',
+                        format: 'a4'
+                    });
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+                    const ratio = canvasHeight / canvasWidth;
+                    const height = pdfWidth * ratio;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
+                    pdf.save(`${this.state.currentFile.replace('.md', '')}.pdf`);
+                    closeModal('appModal');
+                }).catch(err => {
+                    console.error("PDF Export Error:", err);
+                    this.showError("Could not export to PDF.");
+                });
+            }
+
+            toggleBookmark(id, event) {
+                event.stopPropagation(); // Prevent section from collapsing
+                const file = this.state.currentFile;
+                if (!this.state.bookmarks[file]) {
+                    this.state.bookmarks[file] = [];
+                }
+                const fileBookmarks = this.state.bookmarks[file];
+                const index = fileBookmarks.indexOf(id);
+                if (index > -1) {
+                    fileBookmarks.splice(index, 1); // Remove bookmark
+                } else {
+                    fileBookmarks.push(id); // Add bookmark
+                }
+                this.saveJSON('bookmarks', this.state.bookmarks);
+                this.generateSidebarContent(); // Regenerate to show new bookmark list
+            }
+
+            updateBookmarkIcons() {
+                const fileBookmarks = this.state.bookmarks[this.state.currentFile] || [];
+                // Reset all icons
+                this.elements.markdownContent.querySelectorAll('.bookmark-icon').forEach(icon => {
+                    icon.textContent = '☆';
+                    icon.classList.remove('bookmarked');
+                });
+                // Activate bookmarked ones
+                fileBookmarks.forEach(id => {
+                    const heading = document.getElementById(id);
+                    if(heading) {
+                        const icon = heading.querySelector('.bookmark-icon');
+                        if(icon) {
+                            icon.textContent = '★';
+                            icon.classList.add('bookmarked');
+                        }
+                    }
+                });
+            }
+
+            // ===== SETTINGS & STORAGE =====
+            loadSettings() {
+                return this.loadJSON('markdownReaderSettingsV2', {
+                    theme: 'dark', fontSize: 18, lineHeight: 1.8, contentWidth: 65,
+                    background: '1', fontFamily: 'serif', glassMorphism: false
+                });
+            }
+
+            saveSettings() {
+                this.saveJSON('markdownReaderSettingsV2', this.state.settings);
+            }
+
+            updateSetting(key, value) {
+                this.state.settings[key] = value;
+                this.applySetting(key, value);
+                this.saveSettings();
+            }
+
+            applySetting(key, value) {
+                const rootStyle = document.documentElement.style;
+                const settingMap = {
+                    'theme': () => document.body.dataset.theme = value,
+                    'fontSize': () => rootStyle.setProperty('--reading-font-size', `${value}px`),
+                    'lineHeight': () => rootStyle.setProperty('--reading-line-height', value),
+                    'contentWidth': () => rootStyle.setProperty('--content-width', `${value}ch`),
+                    'background': () => this.elements.backgroundOverlay.className = `background-overlay bg-gradient-${value}`,
+                    'fontFamily': () => {
+                        const fontMap = { 
+                            serif: 'var(--font-reading)', sans: 'var(--font-sans)', mono: 'var(--font-mono)',
+                            lora: 'var(--font-lora)', roboto: 'var(--font-roboto)', lato: 'var(--font-lato)',
+                            inconsolata: 'var(--font-inconsolata)'
+                        };
+                        rootStyle.setProperty('--reading-font-family', fontMap[value]);
+                    },
+                    'glassMorphism': () => document.body.classList.toggle('glass-morphism-active', value)
+                };
+                if (settingMap[key]) settingMap[key]();
+            }
+
+            applySettings() {
+                Object.entries(this.state.settings).forEach(([key, value]) => {
+                    this.applySetting(key, value);
+                    let control;
+                    if (key === 'glassMorphism') {
+                        control = document.getElementById('glassMorphismToggle');
+                        if (control) control.checked = value;
+                    } else {
+                        control = document.getElementById(`${key}Slider`) || document.getElementById(`${key}Select`);
+                        if (control) control.value = value;
+                    }
+                });
+                const themeIcon = document.getElementById('toggleTheme').querySelector('.icon');
+                themeIcon.textContent = this.state.settings.theme === 'light' ? '🌙' : '☀️';
+            }
+
+            saveReadingPosition() {
+                if (!this.state.currentFile) return;
+                this.state.readingPositions[this.state.currentFile] = window.scrollY;
+                this.saveJSON('readingPositions', this.state.readingPositions);
+            }
+
+            loadReadingPosition() {
+                const position = this.state.readingPositions[this.state.currentFile] || 0;
+                setTimeout(() => window.scrollTo({ top: position, behavior: 'auto' }), 100);
+            }
+
+            saveFilesToStorage() {
+                this.saveJSON('markdownReaderFiles', Array.from(this.state.files.entries()));
+            }
+
+            loadFilesFromStorage() {
+                const storedFiles = this.loadJSON('markdownReaderFiles', []);
+                this.state.files = new Map(storedFiles);
+            }
+
+            updateFileSelect() {
+                const select = this.elements.fileSelectInMenu;
+                select.innerHTML = '<option value="">Recent files...</option>';
+                
+                if (this.state.files.size > 0) {
+                    this.state.files.forEach((file, filename) => {
+                        const option = document.createElement('option');
+                        option.value = filename;
+                        option.textContent = filename;
+                        select.appendChild(option);
+                    });
+                    this.elements.recentFilesItem.style.display = 'flex';
+                } else {
+                    this.elements.recentFilesItem.style.display = 'none';
+                }
+            }
+
+            clearRecentFiles() {
+                if (confirm("Are you sure you want to clear all recent files and associated data (reading positions, bookmarks)? This cannot be undone.")) {
+                    localStorage.removeItem('markdownReaderFiles');
+                    localStorage.removeItem('readingPositions');
+                    localStorage.removeItem('bookmarks');
+                    window.location.reload();
+                }
+            }
+
+            // ===== UTILITY METHODS =====
+            loadJSON(key, defaultValue) {
+                try {
+                    const saved = localStorage.getItem(key);
+                    return saved ? JSON.parse(saved) : defaultValue;
+                } catch {
+                    return defaultValue;
+                }
+            }
+
+            saveJSON(key, value) {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                } catch (e) {
+                    console.error("Error saving to localStorage", e);
+                    this.showError("Could not save data. Local storage may be full.");
+                }
+            }
+
+            showLoading() {
+                this.state.isLoading = true;
+                this.elements.markdownContent.innerHTML = `<div class="loading" style="text-align: center; padding: 4rem 0;"><h2>Processing...</h2></div>`;
+            }
+
+            hideLoading() {
+                this.state.isLoading = false;
+            }
+
+            showError(message) {
+                this.showModal("Error", `<p style="color: var(--error);">${message}</p>`);
+            }
+
+            showModal(title, body) {
+                this.elements.modalTitle.textContent = title;
+                this.elements.modalBody.innerHTML = body;
+                this.elements.appModal.classList.add('active');
+            }
+        }
+
+        // ===== APP INITIALIZATION =====
+        let app;
+        document.addEventListener('DOMContentLoaded', () => {
+            app = new MarkdownReader();
+        });
+    </script>
+</body>
+</html>
