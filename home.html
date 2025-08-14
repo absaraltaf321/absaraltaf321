@@ -449,83 +449,15 @@
         }
 
         /* ===== RESPONSIVE DESIGN ===== */
-        @media (max-width: 1024px) {
-            .main.sidebar-open {
-                margin-left: 0;
-            }
-            .sidebar {
-                transform: translateX(-100%);
-                box-shadow: var(--shadow-heavy);
-            }
-            .sidebar.open {
-                transform: translateX(0);
-            }
-        }
-
         @media (max-width: 768px) {
-            :root { 
-                --header-height: auto; 
-                --content-width: 100%;
-                --reading-width: 100%;
-            }
-            .header { 
-                padding: 0.5rem 1rem; 
-                flex-wrap: wrap; 
-                height: auto; 
-                justify-content: space-between;
-                align-items: center;
-            }
-            .logo { 
-                font-size: 1.1rem; 
-                order: 1;
-            }
-            #sidebarToggleBtn { 
-                display: block;
-                order: 2;
-            }
-            .search-container { 
-                order: 4; 
-                width: 100%; 
-                margin: 0.5rem 0 0;
-            }
-            .menu-container {
-                display: flex;
-                order: 3;
-            }
-            .content-wrapper { 
-                padding: 1.5rem 1rem; 
-            }
-            .controls-panel { 
-                bottom: 1rem; 
-                right: 1rem; 
-                top: auto; 
-                transform: none; 
-                opacity: 0; 
-                transform: translateY(100px); 
-            }
-            .controls-panel.visible { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
-            .floating-section, .reading-stats { 
-                display: none; 
-            }
-            .upload-box {
-                padding: 2rem;
-            }
-            .upload-text {
-                font-size: 1.1rem;
-            }
-            .upload-subtext {
-                font-size: 0.8rem;
-            }
-            .markdown-content {
-                font-size: 1rem;
-                line-height: 1.7;
-            }
-            .markdown-content h1 { font-size: 2rem; }
-            .markdown-content h2 { font-size: 1.75rem; }
-            .markdown-content h3 { font-size: 1.375rem; }
+            :root { --header-height: 56px; }
+            .header { padding: 0 1rem; flex-wrap: wrap; height: auto; padding-bottom: 0.5rem;}
+            .logo { font-size: 1.1rem; }
+            .search-container { order: 3; width: calc(100% - 2rem); margin: 0.5rem auto 0;}
+            .content-wrapper { padding: 2rem 1rem; }
+            .controls-panel { bottom: 1rem; right: 1rem; top: auto; transform: none; opacity: 0; transform: translateY(100px); }
+            .controls-panel.visible { opacity: 1; transform: translateY(0); }
+            .floating-section, .reading-stats { display: none; }
         }
 
         /* ===== ANIMATIONS ===== */
@@ -553,7 +485,6 @@
     <!-- Header -->
     <header class="header">
         <div class="logo">📖 Premium Reader</div>
-        <button class="menu-toggle-btn" id="sidebarToggleBtn" title="Toggle Sidebar" style="display: none;">☰</button>
         <div class="search-container" id="searchContainer" style="display: none;">
             <span>🔍</span>
             <input type="search" id="searchInput" placeholder="Search in document...">
@@ -805,7 +736,7 @@
                     'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn', 
                     'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'appModal',
                     'modalTitle', 'modalBody', 'searchInput', 'searchContainer',
-                    'printBtn', 'exportPdfBtn', 'clearRecentsBtn', 'sidebarToggleBtn'
+                    'printBtn', 'exportPdfBtn', 'clearRecentsBtn'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -872,7 +803,6 @@
                 }
 
                 this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
-                this.elements.sidebarToggleBtn.addEventListener('click', () => this.toggleSidebar());
                 this.elements.searchInput.addEventListener('input', debounce(e => this.searchInDocument(e.target.value), 300));
 
                 // Menu items
@@ -928,9 +858,6 @@
                     }
                     if (!this.elements.menuToggleBtn.contains(e.target) && !this.elements.dropdownMenu.contains(e.target)) {
                         this.hideMenu();
-                    }
-                    if (this.state.sidebarOpen && !this.elements.sidebar.contains(e.target) && !this.elements.sidebarToggleBtn.contains(e.target)) {
-                        this.toggleSidebar();
                     }
                 });
             }
@@ -1537,4 +1464,3 @@
     </script>
 </body>
 </html>
-
