@@ -7,7 +7,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
-        /* --- New Flat Design Styles --- */
+        /* --- Flat Design Styles --- */
         :root {
             --primary-color: #2575fc;
             --secondary-color: #6a11cb;
@@ -29,11 +29,12 @@
             align-items: center;
             min-height: 100vh;
             color: var(--text-color);
+            overflow: hidden; /* Prevents scrollbars from swipe gestures */
         }
 
         .app-container {
             width: 100%;
-            max-width: 400px; /* More mobile-friendly width */
+            max-width: 400px;
             height: 90vh;
             max-height: 750px;
             background: var(--surface-color);
@@ -61,12 +62,13 @@
         .controls {
             display: flex;
             justify-content: center;
+            flex-wrap: wrap; /* Allows controls to wrap on smaller screens */
             gap: 10px;
             align-items: center;
             margin-top: 15px;
         }
 
-        .controls button {
+        .controls button, .filter-container select {
             background: #e4e6eb;
             border: none;
             border-radius: 8px;
@@ -84,15 +86,6 @@
 
         .filter-container {
             font-size: 0.9em;
-        }
-        
-        .filter-container select {
-            background: #e4e6eb;
-            border: none;
-            border-radius: 8px;
-            color: var(--text-color);
-            padding: 8px;
-            font-family: var(--font-family);
         }
         
         /* Card Stack */
@@ -126,12 +119,13 @@
             padding: 20px;
             box-sizing: border-box;
             cursor: grab;
-            transition: transform 0.5s, opacity 0.5s;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
             transform-origin: center;
             will-change: transform;
             box-shadow: 0 4px 12px var(--shadow-color);
             border: 1px solid #e0e0e0;
             color: var(--text-color);
+            user-select: none; /* Prevents text selection during drag */
         }
 
         .card .card-category {
@@ -169,13 +163,6 @@
             color: var(--primary-color);
         }
 
-        .card.note .card-content {
-            text-align: left;
-            align-items: flex-start;
-            font-size: 1em;
-            white-space: pre-wrap; /* To respect newlines in notes */
-        }
-        
         /* Swipe Buttons */
         .swipe-buttons {
             display: flex;
@@ -346,7 +333,6 @@
             <h1>Absar's Flashcards</h1>
             <div class="controls">
                 <button id="add-card-btn"><i class="fas fa-plus"></i> Add Card</button>
-                <button id="add-note-btn"><i class="fas fa-file-alt"></i> Add Note</button>
                 <button id="shuffle-btn"><i class="fas fa-random"></i> Shuffle</button>
                 <div class="filter-container">
                     <label for="category-filter">Category:</label>
@@ -413,12 +399,11 @@
         // --- DOM Elements ---
         const cardStack = document.querySelector('.card-stack');
         const addCardBtn = document.getElementById('add-card-btn');
-        const addNoteBtn = document.getElementById('add-note-btn');
         const shuffleBtn = document.getElementById('shuffle-btn');
         const categoryFilter = document.getElementById('category-filter');
         const modal = document.getElementById('add-edit-modal');
         const modalTitle = document.getElementById('modal-title');
-        const closeModalBtn = document.querySelector('.close-btn');
+        const closeModalBtn = modal.querySelector('.close-btn');
         const addEditForm = document.getElementById('add-edit-form');
         const saveCardBtn = document.getElementById('save-card-btn');
         const categoryInput = document.getElementById('card-category');
@@ -426,6 +411,8 @@
         const answerInput = document.getElementById('card-answer');
         const colorInput = document.getElementById('card-color');
         const categoryList = document.getElementById('category-list');
+        const likeBtn = document.getElementById('like-btn');
+        const dislikeBtn = document.getElementById('dislike-btn');
 
         // --- State ---
         let currentCards = [];
@@ -481,36 +468,28 @@
 
             filteredCards.slice().reverse().forEach((cardData, index) => {
                 const card = createCardElement(cardData);
-                card.style.zIndex = filteredCards.length - index;
-                const originalTransform = `translateY(${-index * 4}px) scale(${1 - (filteredCards.length - 1 - index) * 0.05})`;
-                card.style.transform = originalTransform;
-                card.dataset.originalTransform = originalTransform;
+                
+                // New stacking effect: position cards behind the top one
+                const stackPosition = filteredCards.length - 1 - index;
+                card.style.zIndex = index;
+                
+                // Only apply stacking transform to cards that are not on top
+                if (stackPosition > 0) {
+                    const scale = 1 - (stackPosition * 0.04);
+                    const translateY = -stackPosition * 10;
+                    card.style.transform = `translateY(${translateY}px) scale(${scale})`;
+                }
+
                 cardStack.appendChild(card);
             });
             initSwipe();
         }
 
-        function getLighterShade(hexColor) {
-            const percent = 20; // lighten by 20%
-            let r = parseInt(hexColor.slice(1, 3), 16);
-            let g = parseInt(hexColor.slice(3, 5), 16);
-            let b = parseInt(hexColor.slice(5, 7), 16);
-
-            r = Math.min(255, r + Math.floor((255 - r) * (percent / 100)));
-            g = Math.min(255, g + Math.floor((255 - g) * (percent / 100)));
-            b = Math.min(255, b + Math.floor((255 - b) * (percent / 100)));
-
-            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        }
-
         function createCardElement(cardData) {
             const card = document.createElement('div');
             card.className = 'card';
-            if (cardData.type === 'note') {
-                card.classList.add('note');
-            }
             card.dataset.id = cardData.id;
-            card.style.background = `linear-gradient(135deg, ${cardData.color}, ${getLighterShade(cardData.color)})`;
+            card.style.backgroundColor = cardData.color;
             card.innerHTML = `
                 <div class="card-category">${cardData.category}</div>
                 <div class="card-content" data-side="question">${cardData.question}</div>
@@ -558,6 +537,7 @@
         function updateCategoryLists() {
             const categorySet = new Set(currentCards.map(card => card.category));
             categoryList.innerHTML = '';
+            const currentFilterValue = categoryFilter.value;
             categoryFilter.innerHTML = '<option value="all">All</option>';
             categorySet.forEach(cat => {
                 const option = document.createElement('option');
@@ -569,22 +549,16 @@
                 filterOption.textContent = cat;
                 categoryFilter.appendChild(filterOption);
             });
+            categoryFilter.value = currentFilterValue;
         }
 
-        function openAddModal(type = 'card') {
+        function openAddModal() {
             editingCardId = null;
             addEditForm.reset();
             colorInput.value = '#ffffff';
-            if (type === 'note') {
-                modalTitle.textContent = 'Add New Note';
-                questionInput.placeholder = 'Enter title';
-                answerInput.placeholder = 'Enter note content';
-            } else {
-                modalTitle.textContent = 'Add New Card';
-                questionInput.placeholder = "What's the question?";
-                answerInput.placeholder = 'Enter the answer.';
-            }
-            addEditForm.dataset.type = type;
+            modalTitle.textContent = 'Add New Card';
+            questionInput.placeholder = "What's the question?";
+            answerInput.placeholder = 'Enter the answer.';
             modal.style.display = 'flex';
         }
 
@@ -607,23 +581,19 @@
 
         function handleFormSubmit(e) {
             e.preventDefault();
-            const type = e.target.dataset.type || 'card';
             const cardData = {
                 category: categoryInput.value.trim(),
                 question: questionInput.value.trim(),
                 answer: answerInput.value.trim(),
                 color: colorInput.value,
-                type: type
             };
 
             if (editingCardId) {
-                // Update existing card
                 const cardIndex = currentCards.findIndex(c => c.id === editingCardId);
                 if (cardIndex > -1) {
                     currentCards[cardIndex] = { ...currentCards[cardIndex], ...cardData };
                 }
             } else {
-                // Add new card
                 cardData.id = `card-${Date.now()}-${Math.random()}`;
                 currentCards.push(cardData);
             }
@@ -681,8 +651,6 @@
 
             const closeBtn = subcardsModal.querySelector('.close-btn');
             closeBtn.onclick = () => subcardsModal.style.display = 'none';
-
-            // --- Subcard Event Handlers ---
             
             const addSubcardHandler = (e) => {
                 e.preventDefault();
@@ -704,7 +672,6 @@
                 }
             };
             
-            // To prevent multiple listeners, we remove the old one before adding a new one.
             addSubcardForm.removeEventListener('submit', addSubcardHandler);
             addSubcardForm.addEventListener('submit', addSubcardHandler);
 
@@ -722,7 +689,6 @@
                 if (e.target.closest('.edit-subcard-btn')) {
                     const questionDiv = subcardEl.querySelector('.subcard-question');
                     const answerDiv = subcardEl.querySelector('.subcard-answer');
-                    const actionsDiv = subcardEl.querySelector('.subcard-actions');
                     
                     const originalQuestion = questionDiv.textContent;
                     const originalAnswer = answerDiv.textContent;
@@ -765,22 +731,29 @@
         // --- Swipe Logic ---
         function initSwipe() {
             const cards = document.querySelectorAll('.card');
-            cards.forEach(card => {
-                card.addEventListener('mousedown', startDrag);
-                card.addEventListener('touchstart', startDrag, { passive: true });
-            });
+            if (cards.length > 0) {
+                const topCard = cards[cards.length - 1];
+                topCard.addEventListener('mousedown', startDrag);
+                topCard.addEventListener('touchstart', startDrag, { passive: true });
+            }
         }
 
         function startDrag(e) {
             if (activeCard) return;
             activeCard = this;
             activeCard.style.cursor = 'grabbing';
-            const rect = activeCard.getBoundingClientRect();
-            startX = (e.clientX || e.touches[0].clientX) - rect.left;
-            startY = (e.clientY || e.touches[0].clientY) - rect.top;
+            activeCard.style.transition = 'none'; // Remove transition while dragging
+
+            // Store the initial viewport coordinates of the touch/click
+            startX = e.clientX || e.touches[0].clientX;
+            startY = e.clientY || e.touches[0].clientY;
+            
+            // Reset movement trackers
+            moveX = 0;
+            moveY = 0;
             
             document.addEventListener('mousemove', drag);
-            document.addEventListener('touchmove', drag);
+            document.addEventListener('touchmove', drag, { passive: false });
             document.addEventListener('mouseup', endDrag);
             document.addEventListener('touchend', endDrag);
         }
@@ -788,60 +761,87 @@
         function drag(e) {
             if (!activeCard) return;
             e.preventDefault();
-            moveX = (e.clientX || e.touches[0].clientX) - startX;
-            moveY = (e.clientY || e.touches[0].clientY) - startY;
+
+            // Calculate the distance moved from the start position
+            const currentX = e.clientX || e.touches[0].clientX;
+            const currentY = e.clientY || e.touches[0].clientY;
+            moveX = currentX - startX;
+            moveY = currentY - startY;
             
-            const rotate = moveX / 25;
+            // Apply the transform to make the card follow the finger/cursor
+            const rotate = moveX / 20; // Add a slight rotation effect
             activeCard.style.transform = `translateX(${moveX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
         }
 
-        function endDrag(e) {
+        function endDrag() {
             if (!activeCard) return;
             
-            const tapThreshold = 5;
-            const isTap = Math.abs(moveX) < tapThreshold && Math.abs(moveY) < tapThreshold;
-
-            if (isTap) {
-                flipCard(activeCard);
-            }
-
-            activeCard.style.cursor = 'grab';
             document.removeEventListener('mousemove', drag);
             document.removeEventListener('touchmove', drag);
             document.removeEventListener('mouseup', endDrag);
             document.removeEventListener('touchend', endDrag);
 
+            activeCard.style.cursor = 'grab';
+            activeCard.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'; // Re-add transition for snap back
+
             const decisionThreshold = 100;
-            if (Math.abs(moveX) > decisionThreshold) {
+            const isTap = Math.abs(moveX) < 5 && Math.abs(moveY) < 5;
+
+            if (isTap) {
+                flipCard(activeCard);
+                activeCard.style.transform = ''; // Reset transform if it was a tap
+            } else if (Math.abs(moveX) > decisionThreshold) {
+                // Swipe the card off-screen
                 const direction = moveX > 0 ? 1 : -1;
-                activeCard.style.transition = 'transform 0.5s ease-out';
-                activeCard.style.transform = `translateX(${direction * 500}px) translateY(${moveY}px) rotate(${direction * 30}deg)`;
-                setTimeout(() => {
-                    const cardId = activeCard.dataset.id;
-                    currentCards = currentCards.filter(c => c.id !== cardId);
-                    saveCards();
-                    renderCards();
-                }, 200);
+                swipeCard(direction);
             } else {
-                activeCard.style.transition = 'transform 0.2s cubic-bezier(0.25, 0.8, 0.25, 1)';
-                activeCard.style.transform = activeCard.dataset.originalTransform;
+                // Snap the card back to its original position
+                activeCard.style.transform = '';
             }
             
             activeCard = null;
-            moveX = 0;
-            moveY = 0;
+        }
+
+        function swipeCard(direction) {
+            if (!activeCard) {
+                const cards = document.querySelectorAll('.card');
+                if (cards.length === 0) return;
+                activeCard = cards[cards.length - 1];
+            }
+            
+            const flyoutX = (direction > 0 ? 1 : -1) * (window.innerWidth * 0.75);
+            const rotate = flyoutX / 20;
+            
+            activeCard.style.transform = `translateX(${flyoutX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
+
+            setTimeout(() => {
+                const cardId = activeCard.dataset.id;
+                const cardIndex = currentCards.findIndex(c => c.id === cardId);
+                if (cardIndex > -1) {
+                    // Move card to the back of the deck instead of deleting
+                    const [swipedCard] = currentCards.splice(cardIndex, 1);
+                    currentCards.unshift(swipedCard);
+                }
+                saveCards();
+                renderCards();
+            }, 300);
         }
 
         // --- Event Listeners ---
-        addCardBtn.addEventListener('click', () => openAddModal('card'));
-        addNoteBtn.addEventListener('click', () => openAddModal('note'));
+        addCardBtn.addEventListener('click', openAddModal);
         closeModalBtn.addEventListener('click', closeModal);
         addEditForm.addEventListener('submit', handleFormSubmit);
         shuffleBtn.addEventListener('click', shuffleCards);
         categoryFilter.addEventListener('change', renderCards);
+        likeBtn.addEventListener('click', () => swipeCard(1));
+        dislikeBtn.addEventListener('click', () => swipeCard(-1));
+
         window.addEventListener('click', (e) => {
-            if (e.target === modal) {
+            if (e.target === modal || e.target.closest('.modal') && e.target.classList.contains('close-btn')) {
                 closeModal();
+            }
+            if (e.target === document.getElementById('subcards-modal') || e.target.closest('#subcards-modal .close-btn')) {
+                 document.getElementById('subcards-modal').style.display = 'none';
             }
         });
 
