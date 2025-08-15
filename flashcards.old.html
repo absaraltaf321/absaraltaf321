@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ABS Flashcards system</title>
+  <!-- Elegant font from Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500&display=swap" rel="stylesheet">
+  <!-- MathJax for LaTeX rendering -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+  <style>
+    /* Header Styling */
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    header h1 {
+      font-size: 2.5em;
+      margin: 0;
+      color: #fff;
+      background: linear-gradient(135deg, #000000, #004e92);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: glow 2s infinite alternate;
+    }
+
+    @keyframes glow {
+      0% { text-shadow: 0 0 10px rgba(255, 154, 158, 0.8); }
+      100% { text-shadow: 0 0 20px rgba(255, 154, 158, 1); }
+    }
+
+    /* Global Styles */
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #fbc2eb, #a6c1ee);
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Enhanced Controls */
+    .controls {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+      background: linear-gradient(135deg,
+        #FFF0F5, #FCE4EC, #F8BBD0, #F48FB1, #F06292, #EC407A
+      );
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .controls input[type="text"],
+    .controls select {
+      padding: 12px 18px;
+      border: 2px solid rgba(102, 126, 234, 0.2);
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      background: linear-gradient(135deg,
+        #FFFFFF, #FAFAFA, #F5F5F5, #EEEEEE, #E0E0E0, #BDBDBD
+      );
+    }
+
+    .controls input[type="text"]:focus,
+    .controls select:focus {
+      border-color: #ff6f61;
+      box-shadow: 0 0 15px rgba(255, 111, 97, 0.5);
+    }
+
+    .controls button {
+      padding: 12px 24px;
+      background: linear-gradient(135deg,
+        #2C003E, #4A006F, #6A0099, #9C27B0, #D32F2F, #FF6F61
+      );
+      border: none;
+      border-radius: 8px;
+      color: #efff;
+      font-size: 16px;
+      cursor: pointer;
+      transition: transform 0.3s, box-shadow 0.3s;
+      letter-spacing: 0.5px;
+    }
+
+    .controls button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 20px rgba(255, 111, 97, 0.4);
+    }
+
+    /* Flashcards Container */
+    .flashcard-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 25px;
+      justify-content: center;
+      width: 100%;
+      max-width: 1200px;
+      padding: 20px;
+    }
+
+    /* Flashcard Styling */
+    .flashcard {
+      min-width: 280px;
+      min-height: 180px;
+      max-width: 400px;
+      width: auto;
+      height: auto;
+      perspective: 1000px;
+      position: relative;
+      cursor: pointer;
+      margin: 15px;
+      flex: 1 1 auto;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .flashcard:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+    .flashcard-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 180px;
+      transition: transform 0.8s;
+      transform-style: preserve-3d;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+      border-radius: 10px;
+      background: linear-gradient(135deg, #000000, #004e92);
+    }
+
+    .flashcard.flipped .flashcard-inner {
+      transform: rotateY(180deg);
+    }
+
+    .flashcard-front,
+    .flashcard-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 30px 20px;
+      box-sizing: border-box;
+      font-size: 16px;
+      text-align: center;
+      overflow-y: auto;
+    }
+
+    .flashcard-front {
+      background: linear-gradient(135deg,
+        #F3E5F5, #E1BEE7, #CE93D8, #BA68C8, #F8BBD0, #FFCDD2
+      );
+      color: #333;
+    }
+
+    .flashcard-back {
+      background: linear-gradient(135deg,
+        #0B132B, #1C2541, #3A506B, #404B96, #5BC0EB, #6A3293
+      );
+      color: #fff;
+      transform: rotateY(180deg);
+    }
+
+    /* Note Card Styling */
+    .flashcard.note {
+      min-width: 400px;
+      min-height: 300px;
+    }
+    .flashcard.note .flashcard-back {
+      background: linear-gradient(135deg, #FFC107, #333333);
+      color: #fff;
+      transform: rotateY(180deg);
+    }
+
+    /* Edit Mode Styling */
+    .edit-mode {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 20px;
+    }
+
+    .edit-mode input, .edit-mode textarea {
+      padding: 10px;
+      border: 2px solid #ccc;
+      border-radius: 5px;
+      font-size: 14px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .edit-mode button {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .save-btn {
+      background: #28a745;
+      color: #fff;
+    }
+
+    .save-btn:hover {
+      background: #218838;
+    }
+
+    .cancel-btn {
+      background: #dc3545;
+      color: #fff;
+    }
+
+    .cancel-btn:hover {
+      background: #c82333;
+    }
+
+    /* Delete & Edit Buttons */
+    .delete-btn,
+    .edit-btn {
+      position: absolute;
+      top: 12px;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    .delete-btn {
+      right: 12px;
+      background: linear-gradient(135deg, #ff6b6b, #ff4757);
+      box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+      color: #fff;
+    }
+
+    .edit-btn {
+      right: 48px;
+      background: linear-gradient(135deg,
+        #E3F2FD, #BBDEFB, #90CAF9, #64B5F6, #42A5F5, #2196F3
+      );
+      box-shadow: 0 2px 8px rgba(255, 193, 7, 0.3);
+      color: #fff;
+    }
+
+    .flashcard:hover .delete-btn,
+    .flashcard:hover .edit-btn {
+      opacity: 1;
+      transform: scale(1.1);
+    }
+
+    /* Subcards Container Styling */
+    .subcards-container {
+      margin-top: 10px;
+      padding: 10px;
+      background: linear-gradient(135deg, #f093fb, #f5576c);
+      border-radius: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    /* Subcard Styling */
+    .flashcard.subcard {
+      min-width: 200px;
+      min-height: 140px;
+      max-width: 300px;
+      position: relative;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      background-clip: padding-box;
+      cursor: pointer;
+      perspective: 800px;
+    }
+    .flashcard.subcard::before {
+      content: "";
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      z-index: -1;
+      background: linear-gradient(135deg, #6a11cb, #2575fc);
+      border-radius: 12px;
+    }
+    .flashcard.subcard .flashcard-back {
+      background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+      color: #fff;
+    }
+
+    /* Modal Styling for Subcards */
+    #subcardsModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      backdrop-filter: blur(10px);
+    }
+    #subcardsModal .modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 80%;
+      max-height: 80%;
+      overflow-y: auto;
+      position: relative;
+      animation: fadeInScale 0.4s ease-out;
+    }
+    .close-modal {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .modal-subcards-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 40px;
+    }
+
+    /* Modal Styling for Expanded Note */
+    #noteModal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 3000;
+      backdrop-filter: blur(10px);
+    }
+    #noteModal .modal-content {
+      background: linear-gradient(135deg,
+        #FFFFFF, #FAFAFA, #F5F5F5, #EEEEEE, #E0E0E0, #BDBDBD
+      );
+      padding: 40px;
+      border-radius: 10px;
+      max-width: 90%;
+      max-height: 90%;
+      overflow-y: auto;
+      position: relative;
+      animation: fadeInScale 0.4s ease-out;
+    }
+
+    /* Keyframes for smooth fade-in/scale animation */
+    @keyframes fadeInScale {
+      0% {
+        opacity: 0;
+        transform: scale(0.95);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* Footer Styling */
+    footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 14px;
+      color: #333;
+    }
+
+    footer span {
+      font-weight: bold;
+      background: linear-gradient(135deg, #ff6f61, #ff9a8b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    /* ===== Toggle Button ===== */
+#sidePanelToggle {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  background: #10a37f;  /* A refined green accent */
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+#sidePanelToggle:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== Side Panel Container ===== */
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: -300px;  /* Start hidden off-screen */
+  width: 300px;
+  height: 100%;
+  background: #343541;  /* Dark background similar to OpenAI's sidebar */
+  color: #fff;
+  box-shadow: -2px 0 12px rgba(0, 0, 0, 0.2);
+  transition: right 0.3s ease;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Poppins', sans-serif;
+}
+.side-panel.open {
+  right: 0;
+}
+
+/* ===== Side Panel Header ===== */
+.side-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #444;
+}
+.side-panel-header h3 {
+  font-size: 20px;
+  margin: 0;
+  font-weight: 500;
+}
+.side-panel-header button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.side-panel-header button:hover {
+  transform: scale(1.1);
+}
+
+/* ===== Side Panel Content ===== */
+.side-panel-content {
+  padding: 16px;
+  flex: 1;
+  overflow-y: auto;
+  background: #2b2c33;
+}
+.side-panel-content button {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: #3e3f4b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  text-align: left;
+  font-size: 16px;
+  transition: background 0.2s, transform 0.2s;
+}
+.side-panel-content button:hover {
+  background: #4e4f5b;
+  transform: translateY(-2px);
+}
+
+
+ /* Fullscreen overlay animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  #fullscreenOverlay.fadeIn {
+    animation: fadeIn 0.5s ease-out;
+  }
+  #fullscreenOverlay.fadeOut {
+    animation: fadeOut 0.5s ease-out;
+  }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>ABS Flashcards</h1>
+  </header>
+
+  <div class="controls">
+    <!-- Category input with datalist for existing categories -->
+    <input type="text" id="category" placeholder="Enter category" list="categoryList">
+    <datalist id="categoryList"></datalist>
+
+    <input type="text" id="question" placeholder="Enter question / title">
+    <input type="text" id="answer" placeholder="Enter answer or note content (LaTeX supported)">
+    <button onclick="addNewCard()">Add Card</button>
+    <button onclick="addNewNote()">Add Note</button>
+    <button onclick="shuffleCards()">Shuffle Cards</button>
+    <!-- Dropdown to filter cards by category -->
+    <select id="filterCategory" onchange="renderCards()">
+      <option value="all">Show All Categories</option>
+    </select>
+  </div>
+
+  <div class="flashcard-container" id="cardContainer"></div>
+
+  <!-- Modal for Subcards (initially hidden) -->
+  <div id="subcardsModal"></div>
+  <!-- Modal for Expanded Note (initially hidden) -->
+  <div id="noteModal"></div>
+
+  <!-- ===== Side Panel Toggle Button & Panel ===== -->
+  <button id="sidePanelToggle">☰</button>
+  <div id="sidePanel" class="side-panel">
+    <div class="side-panel-header">
+      <h3>Tools</h3>
+      <button id="closeSidePanel" style="background:none; border:none; color:#fff; font-size:24px; cursor:pointer;">×</button>
+    </div>
+    <div class="side-panel-content">
+      <!-- Option Button: Ink to LaTeX -->
+      <button id="inkToLatexBtn">Ink to LaTeX</button>
+    </div>
+  </div>
+
+  <script>
+    /***********************
+     * Default Cards Data  *
+     ***********************/
+    const cardsData = [
+      {
+        category: "Quantum Mechanics",
+        question: "Time-independent Schrödinger Equation",
+        answer: "$$ -\\frac{\\hbar^2}{2m}\\nabla^2\\psi(\\mathbf{r}) + V(\\mathbf{r})\\psi(\\mathbf{r}) = E\\psi(\\mathbf{r}) $$",
+        type: "card"
+      },
+      {
+        category: "Quantum Mechanics",
+        question: "Time-dependent Schrödinger Equation",
+        answer: "$$ i\\hbar\\,\\frac{\\partial}{\\partial t}\\psi(\\mathbf{r},t) = -\\frac{\\hbar^2}{2m}\\nabla^2\\psi(\\mathbf{r},t) + V(\\mathbf{r})\\psi(\\mathbf{r},t) $$",
+        type: "card"
+      },
+      {
+        category: "Quantum Mechanics",
+        question: "Momentum Operator",
+        answer: "$$ \\hat{p} = -i\\hbar\\,\\frac{\\partial}{\\partial x} $$",
+        type: "card"
+      },
+      {
+        category: "Quantum Mechanics",
+        question: "Position Operator",
+        answer: "$$ \\hat{x} = x $$",
+        type: "card"
+      },
+      {
+        category: "Quantum Mechanics",
+        question: "Probability Density",
+        answer: "$$ \\rho(\\mathbf{r},t) = |\\psi(\\mathbf{r},t)|^2 $$",
+        type: "card"
+      },
+      {
+        category: "Quantum Mechanics",
+        question: "Current Density",
+        answer: "$$ \\mathbf{j}(\\mathbf{r},t) = \\frac{\\hbar}{2mi}\\left(\\psi^*\\nabla\\psi - \\psi\\nabla\\psi^*\\right) $$",
+        type: "card"
+      }
+    ];
+
+    let currentCards = [];
+
+    /******************************
+     * Rendering & Storage Logic  *
+     ******************************/
+    function renderCards() {
+      const container = document.getElementById('cardContainer');
+      container.innerHTML = '';
+      const filterValue = document.getElementById('filterCategory').value;
+      const filteredCards = filterValue === 'all'
+        ? currentCards
+        : currentCards.filter(card => card.category === filterValue);
+      filteredCards.forEach(card => {
+        container.appendChild(createCard(card));
+      });
+      updateCategoryLists();
+    }
+
+    function updateCategoryLists() {
+      const categorySet = new Set();
+      currentCards.forEach(card => {
+        if (card.category) categorySet.add(card.category);
+      });
+      const dataList = document.getElementById('categoryList');
+      dataList.innerHTML = '';
+      categorySet.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        dataList.appendChild(option);
+      });
+      const filterSelect = document.getElementById('filterCategory');
+      const currentSelection = filterSelect.value;
+      filterSelect.innerHTML = '<option value="all">Show All Categories</option>';
+      categorySet.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat;
+        option.textContent = cat;
+        filterSelect.appendChild(option);
+      });
+      filterSelect.value = currentSelection;
+    }
+
+    function loadCards() {
+      const saved = localStorage.getItem('flashcards');
+      if (saved) {
+        currentCards = JSON.parse(saved);
+      } else {
+        currentCards = cardsData.map(card => ({
+          ...card,
+          id: `card-${Date.now()}-${Math.random()}`
+        }));
+      }
+      renderCards();
+    }
+
+    function saveCards() {
+      localStorage.setItem('flashcards', JSON.stringify(currentCards));
+    }
+
+    /******************************
+     * Modal Functions for Subcards *
+     ******************************/
+    function openSubcardsModal(parentCard) {
+      const modal = document.getElementById('subcardsModal');
+      modal.innerHTML = ''; // Clear previous modal content
+
+      const modalContent = document.createElement('div');
+      modalContent.className = 'modal-content';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'close-modal';
+      closeBtn.textContent = '×';
+      closeBtn.onclick = closeSubcardsModal;
+      modalContent.appendChild(closeBtn);
+
+      const modalTitle = document.createElement('h2');
+      modalTitle.textContent = 'Subcards';
+      modalTitle.style.textAlign = 'center';
+      modalContent.appendChild(modalTitle);
+
+      const modalSubcardsContainer = document.createElement('div');
+      modalSubcardsContainer.className = 'modal-subcards-container';
+      if (parentCard.subcards && parentCard.subcards.length > 0) {
+        parentCard.subcards.forEach(subcard => {
+          modalSubcardsContainer.appendChild(createSubcardForModal(subcard));
+        });
+      } else {
+        const noSubcardsMsg = document.createElement('p');
+        noSubcardsMsg.textContent = 'No subcards available.';
+        modalSubcardsContainer.appendChild(noSubcardsMsg);
+      }
+      modalContent.appendChild(modalSubcardsContainer);
+      modal.appendChild(modalContent);
+      modal.style.display = 'flex';
+    }
+
+    function closeSubcardsModal() {
+      const modal = document.getElementById('subcardsModal');
+      modal.style.display = 'none';
+    }
+
+    /******************************
+     * Modal Functions for Expanded Note *
+     ******************************/
+    function openNoteModal(noteCard) {
+      const noteModal = document.getElementById('noteModal');
+      noteModal.innerHTML = ''; // Clear previous content
+
+      const modalContent = document.createElement('div');
+      modalContent.className = 'modal-content';
+
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'close-modal';
+      closeBtn.textContent = '×';
+      closeBtn.onclick = closeNoteModal;
+      modalContent.appendChild(closeBtn);
+
+      const modalTitle = document.createElement('h2');
+      modalTitle.textContent = noteCard.question;
+      modalTitle.style.textAlign = 'center';
+      modalContent.appendChild(modalTitle);
+
+      const contentDiv = document.createElement('div');
+      contentDiv.innerHTML = noteCard.answer;
+      contentDiv.style.marginTop = '20px';
+      modalContent.appendChild(contentDiv);
+
+      noteModal.appendChild(modalContent);
+      noteModal.style.display = 'flex';
+
+      // Re-render MathJax if needed
+      if (window.MathJax) {
+        MathJax.typesetPromise([contentDiv])
+          .catch(err => console.log(err.message));
+      }
+    }
+
+    function closeNoteModal() {
+      document.getElementById('noteModal').style.display = 'none';
+    }
+
+    /******************************
+     * Subcard Creation Functions *
+     ******************************/
+    // Create a subcard for the main card view (includes edit & delete)
+    function createSubcard(subcard, parentCard) {
+      const subcardElement = document.createElement('div');
+      subcardElement.className = 'flashcard subcard';
+      subcardElement.dataset.subcardId = subcard.id;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        parentCard.subcards = parentCard.subcards.filter(sc => sc.id !== subcard.id);
+        saveCards();
+        renderCards();
+      };
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit-btn';
+      editBtn.textContent = '✎';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        enableSubcardEditMode(subcardElement, subcard, parentCard);
+      };
+
+      const subcardInner = document.createElement('div');
+      subcardInner.className = 'flashcard-inner';
+      subcardInner.innerHTML = `
+        <div class="flashcard-front">
+          <div>${subcard.question}</div>
+        </div>
+        <div class="flashcard-back">${subcard.answer}</div>
+      `;
+
+      // On click, open the modal to show all subcards for this parent card.
+      subcardElement.onclick = (e) => {
+        e.stopPropagation();
+        if (subcardElement.classList.contains('editing')) return;
+        openSubcardsModal(parentCard);
+      };
+
+      subcardElement.appendChild(deleteBtn);
+      subcardElement.appendChild(editBtn);
+      subcardElement.appendChild(subcardInner);
+      return subcardElement;
+    }
+
+    // Create a subcard for modal view (read-only with flip toggle)
+    function createSubcardForModal(subcard) {
+      const subcardElement = document.createElement('div');
+      subcardElement.className = 'flashcard subcard';
+      subcardElement.dataset.subcardId = subcard.id;
+
+      const subcardInner = document.createElement('div');
+      subcardInner.className = 'flashcard-inner';
+      subcardInner.innerHTML = `
+        <div class="flashcard-front">
+          <div>${subcard.question}</div>
+        </div>
+        <div class="flashcard-back">${subcard.answer}</div>
+      `;
+
+      subcardElement.onclick = () => {
+        subcardElement.classList.toggle('flipped');
+        setTimeout(() => {
+          if (window.MathJax) {
+            MathJax.typesetPromise([subcardElement.querySelector('.flashcard-back')])
+              .catch(err => console.log(err.message));
+          }
+        }, 500);
+      };
+
+      subcardElement.appendChild(subcardInner);
+      return subcardElement;
+    }
+
+    /******************************
+     * Card Creation Functions    *
+     ******************************/
+    function createCard(card) {
+      const cardElement = document.createElement('div');
+      cardElement.className = 'flashcard';
+      if (card.type === "note") cardElement.classList.add("note");
+      cardElement.dataset.cardId = card.id;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.textContent = '×';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        currentCards = currentCards.filter(c => c.id !== card.id);
+        saveCards();
+        renderCards();
+      };
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit-btn';
+      editBtn.textContent = '✎';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        enableEditMode(cardElement, card);
+      };
+
+      const cardInner = document.createElement('div');
+      cardInner.className = 'flashcard-inner';
+      cardInner.innerHTML = `
+        <div class="flashcard-front">
+          ${card.category ? `<div style="font-weight:bold; margin-bottom:8px;">${card.category}</div>` : ''}
+          <div>${card.question}</div>
+        </div>
+        <div class="flashcard-back">${card.answer}</div>
+      `;
+
+      cardElement.onclick = () => {
+        if (!cardElement.classList.contains('editing')) {
+          cardElement.classList.toggle('flipped');
+          setTimeout(() => {
+            if (window.MathJax) {
+              MathJax.typesetPromise([cardInner.querySelector('.flashcard-back')])
+                .catch(err => console.log(err.message));
+            }
+          }, 500);
+        }
+      };
+
+      cardElement.appendChild(deleteBtn);
+      cardElement.appendChild(editBtn);
+      cardElement.appendChild(cardInner);
+
+      // If the card has subcards, add a button to open the subcards modal.
+      if (card.subcards && card.subcards.length > 0) {
+        const toggleSubcardsBtn = document.createElement('button');
+        toggleSubcardsBtn.textContent = 'Show Subcards';
+        toggleSubcardsBtn.style.marginTop = '10px';
+        toggleSubcardsBtn.style.padding = '6px 12px';
+        toggleSubcardsBtn.style.background = '#667eea';
+        toggleSubcardsBtn.style.color = '#fff';
+        toggleSubcardsBtn.style.border = 'none';
+        toggleSubcardsBtn.style.borderRadius = '5px';
+        toggleSubcardsBtn.style.cursor = 'pointer';
+        toggleSubcardsBtn.onclick = (e) => {
+          e.stopPropagation();
+          openSubcardsModal(card);
+        };
+        cardElement.appendChild(toggleSubcardsBtn);
+      }
+
+      // If the card is a note, add an Expand button
+      if (card.type === "note") {
+        const expandBtn = document.createElement('button');
+        expandBtn.textContent = 'Expand';
+        expandBtn.style.marginTop = '10px';
+        expandBtn.style.padding = '6px 12px';
+        expandBtn.style.background = '#28a745';
+        expandBtn.style.color = '#fff';
+        expandBtn.style.border = 'none';
+        expandBtn.style.borderRadius = '5px';
+        expandBtn.style.cursor = 'pointer';
+        expandBtn.onclick = (e) => {
+          e.stopPropagation();
+          openNoteModal(card);
+        };
+        cardElement.appendChild(expandBtn);
+      }
+
+      return cardElement;
+    }
+
+    /******************************
+     * Edit Mode Functions        *
+     ******************************/
+    function enableSubcardEditMode(subcardElement, subcard, parentCard) {
+      subcardElement.classList.add('editing');
+      const subcardInner = subcardElement.querySelector('.flashcard-inner');
+      const originalContent = subcardInner.innerHTML;
+      subcardInner.innerHTML = '';
+
+      const editContainer = document.createElement('div');
+      editContainer.className = 'edit-mode';
+
+      const questionInput = document.createElement('input');
+      questionInput.type = 'text';
+      questionInput.value = subcard.question;
+      questionInput.placeholder = 'Subcard Question';
+
+      const answerInput = document.createElement('textarea');
+      answerInput.rows = 4;
+      answerInput.value = subcard.answer;
+      answerInput.placeholder = 'Subcard Answer (LaTeX supported)';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-btn';
+      saveBtn.textContent = 'Save';
+      saveBtn.onclick = (e) => {
+        e.stopPropagation();
+        subcard.question = questionInput.value.trim();
+        subcard.answer = answerInput.value.trim();
+        saveCards();
+        renderCards();
+      };
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'cancel-btn';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        subcardInner.innerHTML = originalContent;
+        subcardElement.classList.remove('editing');
+      };
+
+      editContainer.appendChild(questionInput);
+      editContainer.appendChild(answerInput);
+      editContainer.appendChild(saveBtn);
+      editContainer.appendChild(cancelBtn);
+      subcardInner.appendChild(editContainer);
+    }
+
+    function enableEditMode(cardElement, card) {
+      cardElement.classList.add('editing');
+      const cardInner = cardElement.querySelector('.flashcard-inner');
+      const originalContent = cardInner.innerHTML;
+      cardInner.innerHTML = '';
+
+      const editContainer = document.createElement('div');
+      editContainer.className = 'edit-mode';
+
+      const categoryInput = document.createElement('input');
+      categoryInput.type = 'text';
+      categoryInput.value = card.category || '';
+      categoryInput.placeholder = 'Category';
+      categoryInput.setAttribute('list', 'categoryList');
+
+      const questionInput = document.createElement('input');
+      questionInput.type = 'text';
+      questionInput.value = card.question;
+      questionInput.placeholder = 'Question / Title';
+
+      const answerInput = document.createElement('textarea');
+      answerInput.rows = card.type === "note" ? 6 : 4;
+      answerInput.value = card.answer;
+      answerInput.placeholder = 'Answer or note content (LaTeX supported)';
+
+      const saveBtn = document.createElement('button');
+      saveBtn.className = 'save-btn';
+      saveBtn.textContent = 'Save';
+      saveBtn.onclick = (e) => {
+        e.stopPropagation();
+        card.category = categoryInput.value.trim();
+        card.question = questionInput.value.trim();
+        card.answer = answerInput.value.trim();
+        saveCards();
+        renderCards();
+      };
+
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'cancel-btn';
+      cancelBtn.textContent = 'Cancel';
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        cardInner.innerHTML = originalContent;
+        cardElement.classList.remove('editing');
+      };
+
+      editContainer.appendChild(categoryInput);
+      editContainer.appendChild(questionInput);
+      editContainer.appendChild(answerInput);
+      editContainer.appendChild(saveBtn);
+      editContainer.appendChild(cancelBtn);
+
+      // Subcards editing section
+      const subcardsLabel = document.createElement('div');
+      subcardsLabel.textContent = 'Subcards:';
+      subcardsLabel.style.fontWeight = 'bold';
+      subcardsLabel.style.marginTop = '15px';
+      editContainer.appendChild(subcardsLabel);
+
+      const subcardsSection = document.createElement('div');
+      subcardsSection.className = 'subcards-container';
+      if (!card.subcards) card.subcards = [];
+      card.subcards.forEach(subcard => {
+        subcardsSection.appendChild(createSubcard(subcard, card));
+      });
+      editContainer.appendChild(subcardsSection);
+
+      const addSubcardBtn = document.createElement('button');
+      addSubcardBtn.textContent = 'Add Subcard';
+      addSubcardBtn.style.marginTop = '10px';
+      addSubcardBtn.style.padding = '6px 12px';
+      addSubcardBtn.style.background = '#667eea';
+      addSubcardBtn.style.color = '#fff';
+      addSubcardBtn.style.border = 'none';
+      addSubcardBtn.style.borderRadius = '5px';
+      addSubcardBtn.style.cursor = 'pointer';
+      addSubcardBtn.onclick = (e) => {
+        e.stopPropagation();
+        const newSubcard = {
+          id: `card-${Date.now()}-${Math.random()}`,
+          question: 'New Subcard',
+          answer: 'Subcard answer',
+          type: 'subcard'
+        };
+        card.subcards.push(newSubcard);
+        saveCards();
+        renderCards();
+      };
+      editContainer.appendChild(addSubcardBtn);
+
+      cardInner.appendChild(editContainer);
+    }
+
+    /******************************
+     * Adding New Cards / Notes   *
+     ******************************/
+    function addNewCard() {
+      const categoryInput = document.getElementById('category');
+      const questionInput = document.getElementById('question');
+      const answerInput = document.getElementById('answer');
+      const category = categoryInput.value.trim();
+      const question = questionInput.value.trim();
+      const answer = answerInput.value.trim();
+      if (question && answer) {
+        currentCards.push({
+          id: `card-${Date.now()}-${Math.random()}`,
+          category,
+          question,
+          answer,
+          type: "card"
+        });
+        saveCards();
+        renderCards();
+        categoryInput.value = '';
+        questionInput.value = '';
+        answerInput.value = '';
+      }
+    }
+
+    function addNewNote() {
+      const categoryInput = document.getElementById('category');
+      const questionInput = document.getElementById('question');
+      const answerInput = document.getElementById('answer');
+      const category = categoryInput.value.trim();
+      const question = questionInput.value.trim();
+      const answer = answerInput.value.trim();
+      if (question && answer) {
+        currentCards.push({
+          id: `card-${Date.now()}-${Math.random()}`,
+          category,
+          question,
+          answer,
+          type: "note"
+        });
+        saveCards();
+        renderCards();
+        categoryInput.value = '';
+        questionInput.value = '';
+        answerInput.value = '';
+      }
+    }
+
+    function shuffleCards() {
+      for (let i = currentCards.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentCards[i], currentCards[j]] = [currentCards[j], currentCards[i]];
+      }
+      saveCards();
+      renderCards();
+    }
+
+    window.onload = loadCards;
+
+    /* ===== New JS for Side Panel Functionality ===== */
+    document.getElementById('sidePanelToggle').onclick = function() {
+      document.getElementById('sidePanel').classList.add('open');
+    };
+
+    document.getElementById('closeSidePanel').onclick = function() {
+      document.getElementById('sidePanel').classList.remove('open');
+      // Optionally, you can reset the panel content back to the options
+      document.querySelector('.side-panel-content').innerHTML = '<button id="inkToLatexBtn">Ink to LaTeX</button>';
+      // Reattach the event listener for Ink to LaTeX
+      attachInkToLatexListener();
+    };
+
+    function attachInkToLatexListener() {
+      document.getElementById('inkToLatexBtn').onclick = function() {
+        // For example, load the ink-to-latex HTML program in an iframe
+        document.querySelector('.side-panel-content').innerHTML = '<iframe src="ink-to-latex.html" style="width:100%; height:calc(100% - 40px); border:none;"></iframe>';
+      };
+    }
+
+   function attachInkToLatexListener() {
+  document.getElementById('inkToLatexBtn').onclick = function() {
+    // Create a full-screen overlay if it doesn't exist
+    let fullscreenOverlay = document.getElementById('fullscreenOverlay');
+    if (!fullscreenOverlay) {
+      fullscreenOverlay = document.createElement('div');
+      fullscreenOverlay.id = 'fullscreenOverlay';
+      // Full-screen styling
+      fullscreenOverlay.style.position = 'fixed';
+      fullscreenOverlay.style.top = '0';
+      fullscreenOverlay.style.left = '0';
+      fullscreenOverlay.style.width = '100%';
+      fullscreenOverlay.style.height = '100%';
+      fullscreenOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+      fullscreenOverlay.style.display = 'flex';
+      fullscreenOverlay.style.flexDirection = 'column';
+      fullscreenOverlay.style.alignItems = 'center';
+      fullscreenOverlay.style.justifyContent = 'center';
+      fullscreenOverlay.style.zIndex = '9999';
+      // Start with fadeIn animation
+      fullscreenOverlay.classList.add('fadeIn');
+
+      // Create the Back button
+      const backButton = document.createElement('button');
+      backButton.textContent = 'Back';
+      backButton.style.position = 'absolute';
+      backButton.style.top = '20px';
+      backButton.style.left = '20px';
+      backButton.style.padding = '10px 20px';
+      backButton.style.background = '#ff4d4d';
+      backButton.style.color = '#fff';
+      backButton.style.border = 'none';
+      backButton.style.borderRadius = '5px';
+      backButton.style.cursor = 'pointer';
+      backButton.style.fontSize = '16px';
+      backButton.onclick = function() {
+        // Animate fade out and hide the overlay on animation end
+        fullscreenOverlay.classList.remove('fadeIn');
+        fullscreenOverlay.classList.add('fadeOut');
+        fullscreenOverlay.addEventListener('animationend', function handler() {
+          fullscreenOverlay.style.display = 'none';
+          fullscreenOverlay.classList.remove('fadeOut');
+          fullscreenOverlay.removeEventListener('animationend', handler);
+        });
+      };
+
+      // Create the iframe for the Ink to LaTeX program
+      const iframe = document.createElement('iframe');
+      iframe.src = 'ink-to-latex.html';  // Ensure this file is in the same directory
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+
+      fullscreenOverlay.appendChild(backButton);
+      fullscreenOverlay.appendChild(iframe);
+      document.body.appendChild(fullscreenOverlay);
+    }
+
+    // Show the overlay and trigger the fadeIn animation
+    fullscreenOverlay.style.display = 'flex';
+    fullscreenOverlay.classList.remove('fadeOut');
+    fullscreenOverlay.classList.add('fadeIn');
+  };
+}
+
+// Attach the listener on initial load
+attachInkToLatexListener();
+
+
+  </script>
+
+  <footer>
+    &copy; 2025 <span>Absar altaf UNDER indian copyright act 1974</span>
+  </footer>
+</body>
+</html>
