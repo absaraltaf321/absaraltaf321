@@ -7,7 +7,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
     <style>
-        /* --- Flat Design Styles --- */
         :root {
             --primary-color: #2575fc;
             --secondary-color: #6a11cb;
@@ -29,7 +28,7 @@
             align-items: center;
             min-height: 100vh;
             color: var(--text-color);
-            overflow: hidden; /* Prevents scrollbars from swipe gestures */
+            overflow: hidden;
         }
 
         .app-container {
@@ -45,7 +44,6 @@
             overflow: hidden;
         }
 
-        /* Header */
         .app-header {
             padding: 20px;
             border-bottom: 1px solid #e0e0e0;
@@ -62,7 +60,7 @@
         .controls {
             display: flex;
             justify-content: center;
-            flex-wrap: wrap; /* Allows controls to wrap on smaller screens */
+            flex-wrap: wrap;
             gap: 10px;
             align-items: center;
             margin-top: 15px;
@@ -88,7 +86,6 @@
             font-size: 0.9em;
         }
         
-        /* Card Stack */
         .card-stack-container {
             flex-grow: 1;
             display: flex;
@@ -109,33 +106,62 @@
         .card {
             width: 100%;
             height: 100%;
-            border-radius: 15px;
             position: absolute;
             top: 0;
             left: 0;
+            cursor: grab;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            user-select: none;
+            perspective: 1000px;
+            background-color: transparent;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            border-radius: 15px;
+            box-shadow: 0 4px 12px var(--shadow-color);
+        }
+
+        .card.is-flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 15px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             padding: 20px;
             box-sizing: border-box;
-            cursor: grab;
-            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            transform-origin: center;
-            will-change: transform;
-            box-shadow: 0 4px 12px var(--shadow-color);
             border: 1px solid #e0e0e0;
-            color: var(--text-color);
-            user-select: none; /* Prevents text selection during drag */
         }
 
-        .card .card-category {
+        .card-front {
+            /* Background color is set in JS */
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+            /* Background color is set in JS */
+        }
+
+        .card-category {
             font-weight: 500;
             font-size: 0.8em;
             color: var(--text-secondary-color);
             text-align: left;
         }
         
-        .card .card-content {
+        .card-content {
             flex-grow: 1;
             display: flex;
             justify-content: center;
@@ -143,9 +169,10 @@
             font-size: 1.2em;
             text-align: center;
             padding: 10px 0;
+            word-wrap: break-word;
         }
 
-        .card .card-actions {
+        .card-actions {
             display: flex;
             justify-content: flex-end;
             gap: 15px;
@@ -163,7 +190,6 @@
             color: var(--primary-color);
         }
 
-        /* Swipe Buttons */
         .swipe-buttons {
             display: flex;
             justify-content: center;
@@ -192,7 +218,6 @@
         #dislike-btn { color: #ff4d4f; }
         #like-btn { color: #52c41a; }
 
-        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -269,7 +294,6 @@
             background: var(--secondary-color);
         }
 
-        /* Subcards in Modal */
         #subcards-modal .modal-content {
             max-width: 500px;
         }
@@ -292,9 +316,7 @@
 
         .subcard-question { font-weight: 600; }
         .subcard-answer { color: var(--text-secondary-color); font-size: 0.95em; }
-
         .subcard-actions { display: flex; gap: 10px; }
-
         .subcard-actions button {
             background: none;
             border: none;
@@ -396,7 +418,6 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // --- DOM Elements ---
         const cardStack = document.querySelector('.card-stack');
         const addCardBtn = document.getElementById('add-card-btn');
         const shuffleBtn = document.getElementById('shuffle-btn');
@@ -405,7 +426,6 @@
         const modalTitle = document.getElementById('modal-title');
         const closeModalBtn = modal.querySelector('.close-btn');
         const addEditForm = document.getElementById('add-edit-form');
-        const saveCardBtn = document.getElementById('save-card-btn');
         const categoryInput = document.getElementById('card-category');
         const questionInput = document.getElementById('card-question');
         const answerInput = document.getElementById('card-answer');
@@ -414,43 +434,19 @@
         const likeBtn = document.getElementById('like-btn');
         const dislikeBtn = document.getElementById('dislike-btn');
 
-        // --- State ---
         let currentCards = [];
         let editingCardId = null;
         let activeCard = null;
         let startX, startY, moveX, moveY;
 
-        // --- Default Data ---
         const defaultCards = [
-            {
-                id: `card-${Date.now()}-1`,
-                category: "Quantum Mechanics",
-                question: "Time-independent Schrödinger Equation",
-                answer: "$$ -\\frac{\\hbar^2}{2m}\\nabla^2\\psi(\\mathbf{r}) + V(\\mathbf{r})\\psi(\\mathbf{r}) = E\\psi(\\mathbf{r}) $$",
-                color: "#d4edda",
-                subcards: [
-                    { id: 'sub-1', question: 'What is psi?', answer: 'Wave function' },
-                    { id: 'sub-2', question: 'What is V?', answer: 'Potential energy' },
-                ]
-            },
-            {
-                id: `card-${Date.now()}-2`,
-                category: "History",
-                question: "Who was the first US president?",
-                answer: "George Washington",
-                color: "#cceeff"
-            },
+            { id: `card-${Date.now()}-1`, category: "Quantum Mechanics", question: "Time-independent Schrödinger Equation", answer: "The time-independent Schrödinger equation is a fundamental equation in quantum mechanics used to describe the stationary states of a quantum system.", color: "#d4edda", subcards: [{ id: 'sub-1', question: 'What is psi?', answer: 'Wave function' }, { id: 'sub-2', question: 'What is V?', answer: 'Potential energy' }] },
+            { id: `card-${Date.now()}-2`, category: "History", question: "Who was the first US president?", answer: "George Washington", color: "#cceeff" },
         ];
-
-        // --- Functions ---
 
         function loadCards() {
             const savedCards = localStorage.getItem('flashcards');
-            if (savedCards) {
-                currentCards = JSON.parse(savedCards);
-            } else {
-                currentCards = defaultCards;
-            }
+            currentCards = savedCards ? JSON.parse(savedCards) : defaultCards;
             renderCards();
             updateCategoryLists();
         }
@@ -462,37 +458,56 @@
         function renderCards() {
             cardStack.innerHTML = '';
             const filterValue = categoryFilter.value;
-            const filteredCards = filterValue === 'all'
-                ? currentCards
-                : currentCards.filter(card => card.category === filterValue);
+            const filteredCards = filterValue === 'all' ? currentCards : currentCards.filter(card => card.category === filterValue);
+
+            if (filteredCards.length === 0) {
+                cardStack.innerHTML = '<p style="text-align: center; color: var(--text-secondary-color);">No cards in this category. Add one!</p>';
+                return;
+            }
 
             filteredCards.slice().reverse().forEach((cardData, index) => {
                 const card = createCardElement(cardData);
-                
-                // New stacking effect: position cards behind the top one
                 const stackPosition = filteredCards.length - 1 - index;
                 card.style.zIndex = index;
-                
-                // Only apply stacking transform to cards that are not on top
                 if (stackPosition > 0) {
                     const scale = 1 - (stackPosition * 0.04);
                     const translateY = -stackPosition * 10;
                     card.style.transform = `translateY(${translateY}px) scale(${scale})`;
                 }
-
                 cardStack.appendChild(card);
             });
             initSwipe();
+        }
+
+        function getModifiedColor(hexColor, percent) {
+            let r = parseInt(hexColor.slice(1, 3), 16);
+            let g = parseInt(hexColor.slice(3, 5), 16);
+            let b = parseInt(hexColor.slice(5, 7), 16);
+            r = Math.max(0, Math.min(255, r + Math.floor(255 * (percent / 100))));
+            g = Math.max(0, Math.min(255, g + Math.floor(255 * (percent / 100))));
+            b = Math.max(0, Math.min(255, b + Math.floor(255 * (percent / 100))));
+            return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
         }
 
         function createCardElement(cardData) {
             const card = document.createElement('div');
             card.className = 'card';
             card.dataset.id = cardData.id;
-            card.style.backgroundColor = cardData.color;
-            card.innerHTML = `
+
+            const cardInner = document.createElement('div');
+            cardInner.className = 'card-inner';
+
+            const cardFront = document.createElement('div');
+            cardFront.className = 'card-face card-front';
+            cardFront.style.backgroundColor = cardData.color;
+
+            const cardBack = document.createElement('div');
+            cardBack.className = 'card-face card-back';
+            cardBack.style.backgroundColor = getModifiedColor(cardData.color, -10); // Make back 10% darker
+
+            const createFaceContent = (isFront) => `
                 <div class="card-category">${cardData.category}</div>
-                <div class="card-content" data-side="question">${cardData.question}</div>
+                <div class="card-content">${isFront ? cardData.question : cardData.answer}</div>
                 <div class="card-actions">
                     <button class="edit-btn"><i class="fas fa-edit"></i></button>
                     <button class="delete-btn"><i class="fas fa-trash"></i></button>
@@ -500,38 +515,25 @@
                     ${cardData.subcards && cardData.subcards.length > 0 ? '<button class="subcards-btn"><i class="fas fa-layer-group"></i></button>' : ''}
                 </div>
             `;
-            // Add event listeners for card actions
-            card.querySelector('.edit-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                openEditModal(cardData.id);
-            });
-            card.querySelector('.delete-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteCard(cardData.id);
-            });
-            card.querySelector('.flip-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                flipCard(card);
-            });
+
+            cardFront.innerHTML = createFaceContent(true);
+            cardBack.innerHTML = createFaceContent(false);
+
+            cardInner.appendChild(cardFront);
+            cardInner.appendChild(cardBack);
+            card.appendChild(cardInner);
+
+            card.querySelectorAll('.edit-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); openEditModal(cardData.id); }));
+            card.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); deleteCard(cardData.id); }));
+            card.querySelectorAll('.flip-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); flipCard(card); }));
             if (cardData.subcards && cardData.subcards.length > 0) {
-                card.querySelector('.subcards-btn').addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    openSubcardsModal(cardData.id);
-                });
+                card.querySelectorAll('.subcards-btn').forEach(btn => btn.addEventListener('click', (e) => { e.stopPropagation(); openSubcardsModal(cardData.id); }));
             }
             return card;
         }
 
         function flipCard(card) {
-            const content = card.querySelector('.card-content');
-            const cardData = currentCards.find(c => c.id === card.dataset.id);
-            if (content.dataset.side === 'question') {
-                content.innerHTML = cardData.answer;
-                content.dataset.side = 'answer';
-            } else {
-                content.innerHTML = cardData.question;
-                content.dataset.side = 'question';
-            }
+            card.classList.toggle('is-flipped');
         }
         
         function updateCategoryLists() {
@@ -543,7 +545,6 @@
                 const option = document.createElement('option');
                 option.value = cat;
                 categoryList.appendChild(option);
-                
                 const filterOption = document.createElement('option');
                 filterOption.value = cat;
                 filterOption.textContent = cat;
@@ -582,11 +583,16 @@
         function handleFormSubmit(e) {
             e.preventDefault();
             const cardData = {
-                category: categoryInput.value.trim(),
+                category: categoryInput.value.trim() || 'Uncategorized',
                 question: questionInput.value.trim(),
                 answer: answerInput.value.trim(),
                 color: colorInput.value,
             };
+            if (!cardData.question || !cardData.answer) {
+                // A more user-friendly notification could be added here
+                console.log("Question and Answer cannot be empty.");
+                return;
+            }
 
             if (editingCardId) {
                 const cardIndex = currentCards.findIndex(c => c.id === editingCardId);
@@ -605,22 +611,25 @@
         }
         
         function deleteCard(id) {
-            currentCards = currentCards.filter(c => c.id !== id);
-            saveCards();
-            renderCards();
+            const cardElement = document.querySelector(`.card[data-id="${id}"]`);
+            if (cardElement) {
+                cardElement.style.transform = 'scale(0)'; // Animate out
+            }
+            setTimeout(() => {
+                currentCards = currentCards.filter(c => c.id !== id);
+                saveCards();
+                renderCards();
+            }, 300);
         }
 
         function openSubcardsModal(cardId) {
             const card = currentCards.find(c => c.id === cardId);
             if (!card) return;
-
             const subcardsModal = document.getElementById('subcards-modal');
             const subcardsContainer = document.getElementById('subcards-container');
             const subcardsModalTitle = document.getElementById('subcards-modal-title');
             const addSubcardForm = document.getElementById('add-subcard-form');
-
             subcardsModalTitle.textContent = `Subcards for "${card.question}"`;
-            
             function renderSubcards() {
                 subcardsContainer.innerHTML = '';
                 if (card.subcards && card.subcards.length > 0) {
@@ -628,95 +637,31 @@
                         const subcardEl = document.createElement('div');
                         subcardEl.className = 'subcard';
                         subcardEl.dataset.id = subcard.id;
-                        subcardEl.innerHTML = `
-                            <div>
-                                <div class="subcard-question">${subcard.question}</div>
-                                <div class="subcard-answer">${subcard.answer}</div>
-                            </div>
-                            <div class="subcard-actions">
-                                <button class="edit-subcard-btn"><i class="fas fa-edit"></i></button>
-                                <button class="delete-subcard-btn"><i class="fas fa-trash"></i></button>
-                            </div>
-                        `;
+                        subcardEl.innerHTML = `<div><div class="subcard-question">${subcard.question}</div><div class="subcard-answer">${subcard.answer}</div></div><div class="subcard-actions"><button class="edit-subcard-btn"><i class="fas fa-edit"></i></button><button class="delete-subcard-btn"><i class="fas fa-trash"></i></button></div>`;
                         subcardsContainer.appendChild(subcardEl);
                     });
                 } else {
                     subcardsContainer.innerHTML = '<p>No subcards yet. Add one below!</p>';
                 }
             }
-
             renderSubcards();
-            
             subcardsModal.style.display = 'flex';
-
             const closeBtn = subcardsModal.querySelector('.close-btn');
             closeBtn.onclick = () => subcardsModal.style.display = 'none';
-            
             const addSubcardHandler = (e) => {
                 e.preventDefault();
-                const questionInput = document.getElementById('subcard-question');
-                const answerInput = document.getElementById('subcard-answer');
-                const question = questionInput.value.trim();
-                const answer = answerInput.value.trim();
-                if (question && answer) {
+                const qInput = document.getElementById('subcard-question');
+                const aInput = document.getElementById('subcard-answer');
+                if (qInput.value.trim() && aInput.value.trim()) {
                     if (!card.subcards) card.subcards = [];
-                    card.subcards.push({
-                        id: `sub-${Date.now()}`,
-                        question,
-                        answer
-                    });
+                    card.subcards.push({ id: `sub-${Date.now()}`, question: qInput.value.trim(), answer: aInput.value.trim() });
                     saveCards();
                     renderSubcards();
-                    questionInput.value = '';
-                    answerInput.value = '';
+                    qInput.value = ''; aInput.value = '';
                 }
             };
-            
             addSubcardForm.removeEventListener('submit', addSubcardHandler);
             addSubcardForm.addEventListener('submit', addSubcardHandler);
-
-            subcardsContainer.addEventListener('click', (e) => {
-                const subcardEl = e.target.closest('.subcard');
-                if (!subcardEl) return;
-                const subcardId = subcardEl.dataset.id;
-
-                if (e.target.closest('.delete-subcard-btn')) {
-                    card.subcards = card.subcards.filter(sc => sc.id !== subcardId);
-                    saveCards();
-                    renderSubcards();
-                }
-                
-                if (e.target.closest('.edit-subcard-btn')) {
-                    const questionDiv = subcardEl.querySelector('.subcard-question');
-                    const answerDiv = subcardEl.querySelector('.subcard-answer');
-                    
-                    const originalQuestion = questionDiv.textContent;
-                    const originalAnswer = answerDiv.textContent;
-                    
-                    subcardEl.innerHTML = `
-                        <div>
-                            <input type="text" class="edit-subcard-question" value="${originalQuestion}">
-                            <input type="text" class="edit-subcard-answer" value="${originalAnswer}">
-                        </div>
-                        <div class="subcard-actions">
-                            <button class="save-subcard-btn"><i class="fas fa-save"></i></button>
-                        </div>
-                    `;
-                    
-                    subcardEl.querySelector('.save-subcard-btn').addEventListener('click', () => {
-                        const newQuestion = subcardEl.querySelector('.edit-subcard-question').value.trim();
-                        const newAnswer = subcardEl.querySelector('.edit-subcard-answer').value.trim();
-                        
-                        const subcard = card.subcards.find(sc => sc.id === subcardId);
-                        if (subcard && newQuestion && newAnswer) {
-                            subcard.question = newQuestion;
-                            subcard.answer = newAnswer;
-                            saveCards();
-                            renderSubcards();
-                        }
-                    });
-                }
-            });
         }
 
         function shuffleCards() {
@@ -728,7 +673,6 @@
             renderCards();
         }
 
-        // --- Swipe Logic ---
         function initSwipe() {
             const cards = document.querySelectorAll('.card');
             if (cards.length > 0) {
@@ -739,16 +683,14 @@
         }
 
         function startDrag(e) {
-            if (activeCard) return;
+            if (activeCard || e.target.closest('.card-actions')) return;
             activeCard = this;
+            if (activeCard.classList.contains('is-flipped')) return;
+            
             activeCard.style.cursor = 'grabbing';
-            activeCard.style.transition = 'none'; // Remove transition while dragging
-
-            // Store the initial viewport coordinates of the touch/click
+            activeCard.querySelector('.card-inner').style.transition = 'none';
             startX = e.clientX || e.touches[0].clientX;
             startY = e.clientY || e.touches[0].clientY;
-            
-            // Reset movement trackers
             moveX = 0;
             moveY = 0;
             
@@ -761,15 +703,11 @@
         function drag(e) {
             if (!activeCard) return;
             e.preventDefault();
-
-            // Calculate the distance moved from the start position
             const currentX = e.clientX || e.touches[0].clientX;
             const currentY = e.clientY || e.touches[0].clientY;
             moveX = currentX - startX;
             moveY = currentY - startY;
-            
-            // Apply the transform to make the card follow the finger/cursor
-            const rotate = moveX / 20; // Add a slight rotation effect
+            const rotate = moveX / 20;
             activeCard.style.transform = `translateX(${moveX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
         }
 
@@ -782,20 +720,19 @@
             document.removeEventListener('touchend', endDrag);
 
             activeCard.style.cursor = 'grab';
-            activeCard.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'; // Re-add transition for snap back
+            activeCard.querySelector('.card-inner').style.transition = 'transform 0.6s';
 
             const decisionThreshold = 100;
-            const isTap = Math.abs(moveX) < 5 && Math.abs(moveY) < 5;
+            const tapThreshold = 10;
+            const isTap = Math.abs(moveX) < tapThreshold && Math.abs(moveY) < tapThreshold;
 
             if (isTap) {
                 flipCard(activeCard);
-                activeCard.style.transform = ''; // Reset transform if it was a tap
+                activeCard.style.transform = '';
             } else if (Math.abs(moveX) > decisionThreshold) {
-                // Swipe the card off-screen
                 const direction = moveX > 0 ? 1 : -1;
                 swipeCard(direction);
             } else {
-                // Snap the card back to its original position
                 activeCard.style.transform = '';
             }
             
@@ -803,31 +740,34 @@
         }
 
         function swipeCard(direction) {
-            if (!activeCard) {
+            let cardToSwipe = activeCard;
+            if (!cardToSwipe) {
                 const cards = document.querySelectorAll('.card');
                 if (cards.length === 0) return;
-                activeCard = cards[cards.length - 1];
+                cardToSwipe = cards[cards.length - 1];
             }
-            
-            const flyoutX = (direction > 0 ? 1 : -1) * (window.innerWidth * 0.75);
-            const rotate = flyoutX / 20;
-            
-            activeCard.style.transform = `translateX(${flyoutX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
+            if (!cardToSwipe) return;
+
+            cardToSwipe.style.pointerEvents = 'none';
+            const flyoutX = (direction > 0 ? 1 : -1) * (window.innerWidth);
+            const rotate = flyoutX / 40;
+            cardToSwipe.style.transform = `translateX(${flyoutX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
+
+            const cardId = cardToSwipe.dataset.id;
+            const cardIndex = currentCards.findIndex(c => c.id === cardId);
 
             setTimeout(() => {
-                const cardId = activeCard.dataset.id;
-                const cardIndex = currentCards.findIndex(c => c.id === cardId);
+                cardToSwipe.remove(); // Remove element from DOM
                 if (cardIndex > -1) {
-                    // Move card to the back of the deck instead of deleting
                     const [swipedCard] = currentCards.splice(cardIndex, 1);
                     currentCards.unshift(swipedCard);
                 }
                 saveCards();
-                renderCards();
+                // Re-attach listener to the new top card
+                initSwipe();
             }, 300);
         }
 
-        // --- Event Listeners ---
         addCardBtn.addEventListener('click', openAddModal);
         closeModalBtn.addEventListener('click', closeModal);
         addEditForm.addEventListener('submit', handleFormSubmit);
@@ -837,15 +777,12 @@
         dislikeBtn.addEventListener('click', () => swipeCard(-1));
 
         window.addEventListener('click', (e) => {
-            if (e.target === modal || e.target.closest('.modal') && e.target.classList.contains('close-btn')) {
-                closeModal();
-            }
-            if (e.target === document.getElementById('subcards-modal') || e.target.closest('#subcards-modal .close-btn')) {
+            if (e.target === modal) closeModal();
+            if (e.target === document.getElementById('subcards-modal')) {
                  document.getElementById('subcards-modal').style.display = 'none';
             }
         });
 
-        // --- Initial Load ---
         loadCards();
     });
     </script>
