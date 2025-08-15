@@ -1,677 +1,853 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    />
-    <title>Stylish Equation Recognizer &amp; Jiix to LaTeX Converter</title>
-    <!-- Google Fonts -->
-    <link
-      href="https://fonts.googleapis.com/css?family=Montserrat:400,700|Roboto:300,400|Poppins:300,400,600&display=swap"
-      rel="stylesheet"
-    />
-  <style>
-  /* Reset and Global Styles */
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  body {
-    font-family: 'Roboto', sans-serif;
-    /* Updated overall background to a black–blue gradient */
-    background: linear-gradient(135deg, #000000, #004e92);
-    color: #333;
-    min-height: 100vh;
-    position: relative;
-  }
-  /* Header with Animated Gradient and Fixed Position */
-  header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    /* Updated header background to match the new scheme */
-    background: linear-gradient(135deg, #000000, #004e92);
-    padding: 2em 1em;
-    text-align: center;
-    color: #fff;
-    z-index: 1000;
-    overflow: hidden;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  }
-  header::before {
-    content: "";
-    position: absolute;
-    width: 200%;
-    height: 200%;
-    top: -50%;
-    left: -50%;
-    background: radial-gradient(
-      circle at center,
-      rgba(255, 255, 255, 0.15),
-      transparent 70%
-    );
-    animation: rotate 60s linear infinite;
-  }
-  @keyframes rotate {
-    from {
-      transform: rotate(0deg);
-    }
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  header h1 {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 3em;
-    margin-bottom: 0.2em;
-    position: relative;
-    z-index: 1;
-    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
-  }
-  header p {
-    font-size: 1.2em;
-    position: relative;
-    z-index: 1;
-  }
-  /* Main Container as Flex Layout with Fade-in Animation */
-  #container {
-    display: flex;
-    gap: 2em;
-    max-width: 1200px;
-    margin: 170px auto 2em auto; /* Top margin accounts for fixed header height */
-    padding: 2em;
-    z-index: 1;
-     }
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  /* Panels – Each “card” gets a gradient border stroke */
-  .left-panel,
-  .right-panel {
-    /* Use a transparent border with a gradient via border-image */
-    border: 0px solid transparent;
-    border-image: linear-gradient(45deg, #004e92, #000000) 1;
-    border-radius: 12px;
-    padding: 2em;
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.1);
-  }
-  /* Left Panel (Editor, Controls & JSON Output) */
-  .left-panel {
-    flex: 1 1 60%;
-    display: flex;
-    flex-direction: column;
-    background: #fff; /* white background for clarity */
-  }
-  /* Right Panel (LaTeX & Equation Rendering) */
-  .right-panel {
-    flex: 1 1 35%;
-    /* Updated to a black–blue gradient to tie in with the theme */
-    background: linear-gradient(135deg, #0000, #004e92);
-    display: flex;
-    flex-direction: column;
-    gap: 1em;
-  }
-  /* Editor Section */
-  #editor-container {
-    position: relative;
-    height: 400px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 1em;
-  }
-  #editor {
-    width: 100%;
-    height: 100%;
-    background: #fafafa;
-  }
-  /* Navigation Bar */
-  nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5em 0;
-    border-bottom: 1px solid #e0e0e0;
-    margin-bottom: 1em;
-  }
-  .button-div {
-    display: flex;
-    gap: 1em;
-  }
-  .nav-btn {
-    /* Updated buttons to use the new gradient */
-    background: linear-gradient(135deg, #000000, #004e92);
-    color: #fff;
-    border: none;
-    padding: 0.8em 1.2em;
-    border-radius: 8px;
-    font-size: 1em;
-    cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
-  }
-  .nav-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #000000, #004e92);
-    transform: translateY(-2px);
-  }
-  .nav-btn:disabled {
-    background: #ccc;
-    cursor: not-allowed;
-  }
-  select {
-    padding: 0.8em;
-    font-size: 1em;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-    transition: border 0.3s ease;
-  }
-  select:focus {
-    outline: none;
-    border-color: #004e92;
-  }
-  /* JSON Output Section */
-  #json-output {
-    margin-top: 1em;
-  }
-  #json-output h2 {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 1.5em;
-    margin-bottom: 0.5em;
-    color: #333;
-  }
-  #result {
-    width: 100%;
-    height: 120px;
-    font-family: 'Courier New', monospace;
-    font-size: 1em;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 1em;
-    resize: none;
-    background: #fff;
-    transition: background 0.3s ease;
-  }
-  #result:focus {
-    outline: none;
-    background: #f0f8ff;
-  }
-  #copyBtn {
-    background: linear-gradient(135deg, #000000, #004e92);
-    color: #fff;
-    border: none;
-    padding: 0.8em 1.5em;
-    border-radius: 8px;
-    font-size: 1em;
-    cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
-    margin-top: 0.5em;
-  }
-  #copyBtn:hover {
-    background: linear-gradient(135deg, #000000, #004e92);
-    transform: scale(1.02);
-  }
-  /* Right Panel: LaTeX & Rendered Equation Sections */
-  .right-panel section {
-    background: transparent;
-    border: none;
-  }
-  .right-panel h2 {
-    font-family: 'Montserrat', sans-serif;
-    font-size: 1.8em;
-    margin-bottom: 0.5em;
-    color: #fff;
-  }
-  /* Editable LaTeX box styling */
-  #latexOutput {
-    width: 100%;
-    min-height: 80px;
-    font-size: 1.1em;
-    padding: 1em;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-radius: 8px;
-    resize: vertical;
-  }
-  /* Copy LaTeX Button Styling */
-  #copyLatexBtn {
-    background: linear-gradient(135deg, #000000, #004e92);
-    color: #fff;
-    border: none;
-    padding: 0.8em 1.5em;
-    border-radius: 8px;
-    font-size: 1em;
-    cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
-    margin-top: 0.5em;
-    margin-right: 0.5em;
-  }
-  #copyLatexBtn:hover {
-    background: linear-gradient(135deg, #000000, #004e92);
-    transform: scale(1.02);
-  }
-  /* Download LaTeX Button Styling */
-  #downloadLatexBtn {
-    background: linear-gradient(135deg, #000000, #004e92);
-    color: #fff;
-    border: none;
-    padding: 0.8em 1.5em;
-    border-radius: 8px;
-    font-size: 1em;
-    cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
-    margin-top: 0.5em;
-  }
-  #downloadLatexBtn:hover {
-    background: linear-gradient(135deg, #000000, #004e92);
-    transform: scale(1.02);
-  }
-  /* Rendered Equation box styling */
-  #renderedEquation {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-radius: 8px;
-    padding: 1em;
-    font-size: 1.1em;
-    white-space: pre-wrap;
-    min-height: 200px;
-    color: #333;
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
-  }
-  /* Hover effect for the rendered equation box */
-  #renderedEquation:hover {
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    transform: scale(1.01);
-  }
-  /* Active button effect */
-  .nav-btn:active,
-  #copyBtn:active,
-  #copyLatexBtn:active,
-  #downloadLatexBtn:active {
-    transform: scale(0.98);
-  }
-  /* Responsive Adjustments */
-  @media (max-width: 768px) {
-    #container {
-      flex-direction: column;
-    }
-    .left-panel,
-    .right-panel {
-      flex: 1 1 100%;
-      margin-bottom: 1em;
-    }
-    #editor-container {
-      height: 300px;
-    }
-  }
-</style>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absar's Flashcards</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <style>
+        /* --- Flat Design Styles --- */
+        :root {
+            --primary-color: #2575fc;
+            --secondary-color: #6a11cb;
+            --background-color: #f0f2f5;
+            --surface-color: #ffffff;
+            --text-color: #1c1e21;
+            --text-secondary-color: #65676b;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --font-family: 'Montserrat', sans-serif;
+        }
 
-    <!-- Load the MyScript Iink library -->
-    <script type="text/javascript" src="https://unpkg.com/iink-ts/dist/iink.min.js"></script>
-    <!-- MathJax Configuration -->
-    <script>
-      window.MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']]
-        },
-        svg: { fontCache: 'global' }
-      };
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
-  </head>
-  <body>
-    <header>
-      <h1>Equation Recognizer</h1>
-      <p>Handwrite your equation and watch it transform in real time!</p>
-    </header>
-    <div id="container">
-      <!-- Left Panel: Editor, Controls, and JSON Output -->
-      <div class="left-panel">
-        <!-- Editor Section -->
-        <div id="editor-container">
-          <div id="editor" touch-action="none"></div>
+        body {
+            font-family: var(--font-family);
+            background: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-color);
+            overflow: hidden; /* Prevents scrollbars from swipe gestures */
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 400px;
+            height: 90vh;
+            max-height: 750px;
+            background: var(--surface-color);
+            border-radius: 20px;
+            box-shadow: 0 8px 24px var(--shadow-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .app-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .app-header h1 {
+            margin: 0;
+            text-align: center;
+            font-size: 1.5em;
+            color: var(--text-color);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap; /* Allows controls to wrap on smaller screens */
+            gap: 10px;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .controls button, .filter-container select {
+            background: #e4e6eb;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-color);
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-family: var(--font-family);
+            font-size: 0.9em;
+        }
+
+        .controls button:hover {
+            background: #d8dbdf;
+        }
+
+        .filter-container {
+            font-size: 0.9em;
+        }
+        
+        /* Card Stack */
+        .card-stack-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            padding: 20px;
+        }
+
+        .card-stack {
+            width: 90%;
+            height: 100%;
+            position: relative;
+            flex-grow: 1;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            border-radius: 15px;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            cursor: grab;
+            transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform-origin: center;
+            will-change: transform;
+            box-shadow: 0 4px 12px var(--shadow-color);
+            border: 1px solid #e0e0e0;
+            color: var(--text-color);
+            user-select: none; /* Prevents text selection during drag */
+        }
+
+        .card .card-category {
+            font-weight: 500;
+            font-size: 0.8em;
+            color: var(--text-secondary-color);
+            text-align: left;
+        }
+        
+        .card .card-content {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em;
+            text-align: center;
+            padding: 10px 0;
+        }
+
+        .card .card-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+        }
+
+        .card-actions button {
+            background: none;
+            border: none;
+            color: var(--text-secondary-color);
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .card-actions button:hover {
+            color: var(--primary-color);
+        }
+
+        /* Swipe Buttons */
+        .swipe-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            padding-bottom: 10px;
+        }
+
+        .swipe-buttons button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            background: var(--surface-color);
+            box-shadow: 0 4px 15px var(--shadow-color);
+            font-size: 1.8em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .swipe-buttons button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px var(--shadow-color);
+        }
+
+        #dislike-btn { color: #ff4d4f; }
+        #like-btn { color: #52c41a; }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: var(--surface-color);
+            padding: 25px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.8em;
+            cursor: pointer;
+            color: var(--text-secondary-color);
+        }
+
+        #modal-title {
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            background: var(--background-color);
+            font-family: var(--font-family);
+            box-sizing: border-box;
+        }
+
+        #save-card-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary-color);
+            color: #fff;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #save-card-btn:hover {
+            background: var(--secondary-color);
+        }
+
+        /* Subcards in Modal */
+        #subcards-modal .modal-content {
+            max-width: 500px;
+        }
+
+        #subcards-container {
+            max-height: 40vh;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        .subcard {
+            background: var(--background-color);
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .subcard-question { font-weight: 600; }
+        .subcard-answer { color: var(--text-secondary-color); font-size: 0.95em; }
+
+        .subcard-actions { display: flex; gap: 10px; }
+
+        .subcard-actions button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            color: var(--text-secondary-color);
+            transition: color 0.2s;
+        }
+        .subcard-actions button:hover {
+            color: var(--primary-color);
+        }
+        
+        #add-subcard-form {
+            display: flex;
+            gap: 10px;
+        }
+        #add-subcard-form input {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+        #add-subcard-form button {
+            padding: 0 15px;
+            border-radius: 8px;
+            border: none;
+            background: var(--primary-color);
+            color: #fff;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Absar's Flashcards</h1>
+            <div class="controls">
+                <button id="add-card-btn"><i class="fas fa-plus"></i> Add Card</button>
+                <button id="shuffle-btn"><i class="fas fa-random"></i> Shuffle</button>
+                <div class="filter-container">
+                    <label for="category-filter">Category:</label>
+                    <select id="category-filter">
+                        <option value="all">All</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <div class="card-stack-container">
+            <div class="card-stack">
+                <!-- Flashcards will be dynamically inserted here -->
+            </div>
+            <div class="swipe-buttons">
+                <button id="dislike-btn"><i class="fas fa-times"></i></button>
+                <button id="like-btn"><i class="fas fa-heart"></i></button>
+            </div>
         </div>
-        <!-- Navigation Bar -->
-        <nav>
-          <div class="button-div">
-            <button id="clear" class="nav-btn" disabled>Clear</button>
-            <button id="undo" class="nav-btn" disabled>Undo</button>
-            <button id="redo" class="nav-btn" disabled>Redo</button>
-          </div>
-          <select id="language"></select>
-        </nav>
-        <!-- JSON Output Section -->
-        <section id="json-output">
-          <h2>MyScript JSON Output</h2>
-          <textarea
-            id="result"
-            readonly
-            placeholder="The JSON output from MyScript will appear here..."
-          ></textarea>
-          <button id="copyBtn">Copy Output</button>
-        </section>
-      </div>
-      <!-- Right Panel: LaTeX Output and Rendered Equation -->
-      <div class="right-panel">
-        <section id="latex-section">
-          <h2>LaTeX Output</h2>
-          <!-- Editable LaTeX box -->
-          <textarea id="latexOutput" rows="4" placeholder="LaTeX code will appear here..."></textarea>
-          <div style="display: flex; gap: 0.5em;">
-            <button id="copyLatexBtn">Copy LaTeX</button>
-            <button id="downloadLatexBtn">Download LaTeX</button>
-          </div>
-        </section>
-        <section id="rendered-section">
-          <h2>Rendered Equation</h2>
-          <div id="renderedEquation"></div>
-        </section>
-      </div>
+
+        <div id="add-edit-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2 id="modal-title">Add New Card</h2>
+                <form id="add-edit-form">
+                    <div class="form-group">
+                        <label for="card-category">Category</label>
+                        <input type="text" id="card-category" list="category-list" placeholder="Enter or select a category">
+                        <datalist id="category-list"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-question">Question</label>
+                        <textarea id="card-question" rows="3" placeholder="What's the question?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-answer">Answer</label>
+                        <textarea id="card-answer" rows="5" placeholder="Enter the answer."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="card-color">Card Color</label>
+                        <input type="color" id="card-color" value="#ffffff">
+                    </div>
+                    <button type="submit" id="save-card-btn">Save Card</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="subcards-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-btn">&times;</span>
+                <h2 id="subcards-modal-title">Subcards</h2>
+                <div id="subcards-container"></div>
+                <form id="add-subcard-form">
+                    <input type="text" id="subcard-question" placeholder="Question">
+                    <input type="text" id="subcard-answer" placeholder="Answer">
+                    <button type="submit">Add Subcard</button>
+                </form>
+            </div>
+        </div>
     </div>
+
     <script>
-      // DOM References
-      const editorElement = document.getElementById("editor");
-      const resultElement = document.getElementById("result");
-      const languageElement = document.getElementById("language");
-      const clearElement = document.getElementById("clear");
-      const undoElement = document.getElementById("undo");
-      const redoElement = document.getElementById("redo");
-      const copyBtn = document.getElementById("copyBtn");
-      const copyLatexBtn = document.getElementById("copyLatexBtn");
-      const downloadLatexBtn = document.getElementById("downloadLatexBtn");
-      const latexOutput = document.getElementById("latexOutput");
-      const renderedEquation = document.getElementById("renderedEquation");
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- DOM Elements ---
+        const cardStack = document.querySelector('.card-stack');
+        const addCardBtn = document.getElementById('add-card-btn');
+        const shuffleBtn = document.getElementById('shuffle-btn');
+        const categoryFilter = document.getElementById('category-filter');
+        const modal = document.getElementById('add-edit-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const closeModalBtn = modal.querySelector('.close-btn');
+        const addEditForm = document.getElementById('add-edit-form');
+        const saveCardBtn = document.getElementById('save-card-btn');
+        const categoryInput = document.getElementById('card-category');
+        const questionInput = document.getElementById('card-question');
+        const answerInput = document.getElementById('card-answer');
+        const colorInput = document.getElementById('card-color');
+        const categoryList = document.getElementById('category-list');
+        const likeBtn = document.getElementById('like-btn');
+        const dislikeBtn = document.getElementById('dislike-btn');
 
-      // Debounce timer for export calls
-      let exportTimeout = null;
+        // --- State ---
+        let currentCards = [];
+        let editingCardId = null;
+        let activeCard = null;
+        let startX, startY, moveX, moveY;
 
-      // -----------------------------------------------------------
-      // Jiix JSON to LaTeX Conversion Functions
-      // -----------------------------------------------------------
-      function convertNode(node) {
-        if (node && typeof node === "object" && !Array.isArray(node)) {
-          const type = node.type || "";
-          switch (type) {
-            case "Math":
-              const expressions = node.expressions || [];
-              return expressions.map(convertNode).join(" ");
-            case "fraction":
-              const fracOperands = node.operands || [];
-              if (fracOperands.length === 2) {
-                return (
-                  "\\frac{" +
-                  convertNode(fracOperands[0]) +
-                  "}{" +
-                  convertNode(fracOperands[1]) +
-                  "}"
-                );
-              } else {
-                return fracOperands.map(convertNode).join(" ");
-              }
-            case "+":
-            case "-":
-            case "=":
-            case "[":
-            case "]":
-            case "×":
-              const operator = type === "×" ? "\\times" : type;
-              const opOperands = node.operands || [];
-              return opOperands.map(convertNode).join(" " + operator + " ");
-            case "power":
-            case "superscript":
-              const powerOperands = node.operands || [];
-              if (powerOperands.length === 2) {
-                return (
-                  convertNode(powerOperands[0]) +
-                  "^{" +
-                  convertNode(powerOperands[1]) +
-                  "}"
-                );
-              } else {
-                return powerOperands.map(convertNode).join("");
-              }
-            case "subscript":
-              const subOperands = node.operands || [];
-              if (subOperands.length === 2) {
-                return (
-                  convertNode(subOperands[0]) +
-                  "_{" +
-                  convertNode(subOperands[1]) +
-                  "}"
-                );
-              } else {
-                return subOperands.map(convertNode).join("");
-              }
-            case "square root":
-              const sqrtOperands = node.operands || [];
-              if (sqrtOperands.length > 0) {
-                return "\\sqrt{" + convertNode(sqrtOperands[0]) + "}";
-              } else {
-                return "\\sqrt{}";
-              }
-            // If there is a specific node for grouping with braces.
-            case "fence":
-              const braceOperands = node.operands || [];
-              return "(" + braceOperands.map(convertNode).join(" ") + ")";
-            case "number":
-              return node.label || "";
-            case "symbol":
-              return node.label || "";
-            default:
-              if (node.operands) {
-                return node.operands.map(convertNode).join(" ");
-              } else if (node.label) {
-                return node.label;
-              }
-              return "";
-          }
-        } else if (Array.isArray(node)) {
-          return node.map(convertNode).join(" ");
-        } else {
-          return String(node);
-        }
-      }
-
-      function convertJiixToLatex(jsonData) {
-        let root = jsonData;
-        if (typeof jsonData === "string") {
-          try {
-            root = JSON.parse(jsonData);
-          } catch (e) {
-            return "Invalid JSON input.";
-          }
-        }
-        const mimeKey = "application/vnd.myscript.jiix";
-        if (root && typeof root === "object" && root.hasOwnProperty(mimeKey)) {
-          return convertNode(root[mimeKey]);
-        }
-        return convertNode(root);
-      }
-
-      // -----------------------------------------------------------
-      // MyScript Editor Initialization and Event Handling
-      // -----------------------------------------------------------
-      async function loadEditor() {
-        const options = {
-          configuration: {
-            server: {
-              protocol: "WEBSOCKET",
-              scheme: "https",
-              host: "cloud.myscript.com",
-              applicationKey: "072b514f-b9b3-49fa-8d7e-7e15aa8bebe4",
-              hmacKey: "1766422c-3710-405f-a7f3-b01b9bf5df98"
+        // --- Default Data ---
+        const defaultCards = [
+            {
+                id: `card-${Date.now()}-1`,
+                category: "Quantum Mechanics",
+                question: "Time-independent Schrödinger Equation",
+                answer: "$$ -\\frac{\\hbar^2}{2m}\\nabla^2\\psi(\\mathbf{r}) + V(\\mathbf{r})\\psi(\\mathbf{r}) = E\\psi(\\mathbf{r}) $$",
+                color: "#d4edda",
+                subcards: [
+                    { id: 'sub-1', question: 'What is psi?', answer: 'Wave function' },
+                    { id: 'sub-2', question: 'What is V?', answer: 'Potential energy' },
+                ]
             },
-            recognition: {
-              type: "MATH"
+            {
+                id: `card-${Date.now()}-2`,
+                category: "History",
+                question: "Who was the first US president?",
+                answer: "George Washington",
+                color: "#cceeff"
             },
-            exportParameters: {
-              mimeTypes: ["application/vnd.myscript.jiix"]
+        ];
+
+        // --- Functions ---
+
+        function loadCards() {
+            const savedCards = localStorage.getItem('flashcards');
+            if (savedCards) {
+                currentCards = JSON.parse(savedCards);
+            } else {
+                currentCards = defaultCards;
             }
-          }
-        };
-
-        const editor = new iink.Editor(editorElement, options);
-        await editor.initialize();
-
-        // Populate the language selector.
-        const currentLanguage = editor.configuration.recognition.lang;
-        const availableLanguageResponse = await iink.getAvailableLanguageList(
-          editor.configuration
-        );
-        Object.keys(availableLanguageResponse.result).forEach(function (key) {
-          const selected = currentLanguage === key;
-          languageElement.options[languageElement.options.length] =
-            new Option(
-              availableLanguageResponse.result[key],
-              key,
-              selected,
-              selected
-            );
-        });
-
-        // Listen for changes and trigger export.
-        editor.events.addEventListener("changed", (event) => {
-          undoElement.disabled = !event.detail.canUndo;
-          redoElement.disabled = !event.detail.canRedo;
-          clearElement.disabled = !event.detail.canClear;
-          if (exportTimeout) {
-            clearTimeout(exportTimeout);
-          }
-          exportTimeout = setTimeout(() => {
-            editor.export_();
-          }, 1000);
-        });
-
-        // Process export events.
-        editor.events.addEventListener("exported", (event) => {
-          const jsonOutput = event.detail;
-          resultElement.value = JSON.stringify(jsonOutput, null, 2);
-          const latex = convertJiixToLatex(jsonOutput);
-          // Update the editable LaTeX textarea
-          latexOutput.value = latex;
-          // Render the LaTeX output wrapped in display math delimiters.
-          renderedEquation.innerHTML = `$$${latex}$$`;
-          if (window.MathJax && MathJax.typesetPromise) {
-            MathJax.typesetPromise();
-          }
-        });
-
-        // Control buttons.
-        clearElement.addEventListener("click", async () => {
-          await editor.clear();
-          // Immediately clear the output areas.
-          resultElement.value = "";
-          latexOutput.value = "";
-          renderedEquation.innerHTML = "";
-        });
-        undoElement.addEventListener("click", async () => {
-          await editor.undo();
-        });
-        redoElement.addEventListener("click", async () => {
-          await editor.redo();
-        });
-
-        languageElement.addEventListener("change", (e) => {
-          const configuration = JSON.parse(JSON.stringify(editor.configuration));
-          configuration.recognition.lang = e.target.value;
-          editor.configuration = configuration;
-        });
-
-        window.addEventListener("resize", () => {
-          editor.resize();
-        });
-      }
-
-      loadEditor().catch((error) => console.error(error));
-
-      // -----------------------------------------------------------
-      // Copy JSON Output (using navigator.clipboard if available)
-      // -----------------------------------------------------------
-      copyBtn.addEventListener("click", () => {
-        const text = resultElement.value;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(() => {
-            copyBtn.textContent = "Copied!";
-            setTimeout(() => (copyBtn.textContent = "Copy Output"), 2000);
-          });
-        } else {
-          resultElement.select();
-          document.execCommand("copy");
-          copyBtn.textContent = "Copied!";
-          setTimeout(() => (copyBtn.textContent = "Copy Output"), 2000);
+            renderCards();
+            updateCategoryLists();
         }
-      });
 
-      // -----------------------------------------------------------
-      // Copy LaTeX Output (using navigator.clipboard if available)
-      // -----------------------------------------------------------
-      copyLatexBtn.addEventListener("click", () => {
-        const text = latexOutput.value;
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(() => {
-            copyLatexBtn.textContent = "Copied!";
-            setTimeout(() => (copyLatexBtn.textContent = "Copy LaTeX"), 2000);
-          });
-        } else {
-          latexOutput.select();
-          document.execCommand("copy");
-          copyLatexBtn.textContent = "Copied!";
-          setTimeout(() => (copyLatexBtn.textContent = "Copy LaTeX"), 2000);
+        function saveCards() {
+            localStorage.setItem('flashcards', JSON.stringify(currentCards));
         }
-      });
 
-      // -----------------------------------------------------------
-      // Download LaTeX Output as a .tex File
-      // -----------------------------------------------------------
-      downloadLatexBtn.addEventListener("click", () => {
-        const latexText = latexOutput.value;
-        const blob = new Blob([latexText], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "equation.tex";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      });
+        function renderCards() {
+            cardStack.innerHTML = '';
+            const filterValue = categoryFilter.value;
+            const filteredCards = filterValue === 'all'
+                ? currentCards
+                : currentCards.filter(card => card.category === filterValue);
 
-      // -----------------------------------------------------------
-      // Update the Rendered Equation when LaTeX is manually edited.
-      // -----------------------------------------------------------
-      latexOutput.addEventListener("input", () => {
-        const updatedLatex = latexOutput.value;
-        renderedEquation.innerHTML = `$$${updatedLatex}$$`;
-        if (window.MathJax && MathJax.typesetPromise) {
-          MathJax.typesetPromise();
+            filteredCards.slice().reverse().forEach((cardData, index) => {
+                const card = createCardElement(cardData);
+                
+                // New stacking effect: position cards behind the top one
+                const stackPosition = filteredCards.length - 1 - index;
+                card.style.zIndex = index;
+                
+                // Only apply stacking transform to cards that are not on top
+                if (stackPosition > 0) {
+                    const scale = 1 - (stackPosition * 0.04);
+                    const translateY = -stackPosition * 10;
+                    card.style.transform = `translateY(${translateY}px) scale(${scale})`;
+                }
+
+                cardStack.appendChild(card);
+            });
+            initSwipe();
         }
-      });
 
-      // -----------------------------------------------------------
-      // Keyboard Shortcuts for Undo (Ctrl+Z) and Redo (Ctrl+Y)
-      // -----------------------------------------------------------
-      document.addEventListener("keydown", (e) => {
-        if (e.ctrlKey && e.key.toLowerCase() === "z") {
-          e.preventDefault();
-          if (!undoElement.disabled) {
-            undoElement.click();
-          }
-        } else if (e.ctrlKey && e.key.toLowerCase() === "y") {
-          e.preventDefault();
-          if (!redoElement.disabled) {
-            redoElement.click();
-          }
+        function createCardElement(cardData) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.dataset.id = cardData.id;
+            card.style.backgroundColor = cardData.color;
+            card.innerHTML = `
+                <div class="card-category">${cardData.category}</div>
+                <div class="card-content" data-side="question">${cardData.question}</div>
+                <div class="card-actions">
+                    <button class="edit-btn"><i class="fas fa-edit"></i></button>
+                    <button class="delete-btn"><i class="fas fa-trash"></i></button>
+                    <button class="flip-btn"><i class="fas fa-sync-alt"></i></button>
+                    ${cardData.subcards && cardData.subcards.length > 0 ? '<button class="subcards-btn"><i class="fas fa-layer-group"></i></button>' : ''}
+                </div>
+            `;
+            // Add event listeners for card actions
+            card.querySelector('.edit-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openEditModal(cardData.id);
+            });
+            card.querySelector('.delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteCard(cardData.id);
+            });
+            card.querySelector('.flip-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                flipCard(card);
+            });
+            if (cardData.subcards && cardData.subcards.length > 0) {
+                card.querySelector('.subcards-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openSubcardsModal(cardData.id);
+                });
+            }
+            return card;
         }
-      });
+
+        function flipCard(card) {
+            const content = card.querySelector('.card-content');
+            const cardData = currentCards.find(c => c.id === card.dataset.id);
+            if (content.dataset.side === 'question') {
+                content.innerHTML = cardData.answer;
+                content.dataset.side = 'answer';
+            } else {
+                content.innerHTML = cardData.question;
+                content.dataset.side = 'question';
+            }
+        }
+        
+        function updateCategoryLists() {
+            const categorySet = new Set(currentCards.map(card => card.category));
+            categoryList.innerHTML = '';
+            const currentFilterValue = categoryFilter.value;
+            categoryFilter.innerHTML = '<option value="all">All</option>';
+            categorySet.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                categoryList.appendChild(option);
+                
+                const filterOption = document.createElement('option');
+                filterOption.value = cat;
+                filterOption.textContent = cat;
+                categoryFilter.appendChild(filterOption);
+            });
+            categoryFilter.value = currentFilterValue;
+        }
+
+        function openAddModal() {
+            editingCardId = null;
+            addEditForm.reset();
+            colorInput.value = '#ffffff';
+            modalTitle.textContent = 'Add New Card';
+            questionInput.placeholder = "What's the question?";
+            answerInput.placeholder = 'Enter the answer.';
+            modal.style.display = 'flex';
+        }
+
+        function openEditModal(id) {
+            editingCardId = id;
+            const card = currentCards.find(c => c.id === id);
+            if (card) {
+                modalTitle.textContent = 'Edit Card';
+                categoryInput.value = card.category;
+                questionInput.value = card.question;
+                answerInput.value = card.answer;
+                colorInput.value = card.color || '#ffffff';
+                modal.style.display = 'flex';
+            }
+        }
+
+        function closeModal() {
+            modal.style.display = 'none';
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const cardData = {
+                category: categoryInput.value.trim(),
+                question: questionInput.value.trim(),
+                answer: answerInput.value.trim(),
+                color: colorInput.value,
+            };
+
+            if (editingCardId) {
+                const cardIndex = currentCards.findIndex(c => c.id === editingCardId);
+                if (cardIndex > -1) {
+                    currentCards[cardIndex] = { ...currentCards[cardIndex], ...cardData };
+                }
+            } else {
+                cardData.id = `card-${Date.now()}-${Math.random()}`;
+                currentCards.push(cardData);
+            }
+
+            saveCards();
+            renderCards();
+            updateCategoryLists();
+            closeModal();
+        }
+        
+        function deleteCard(id) {
+            currentCards = currentCards.filter(c => c.id !== id);
+            saveCards();
+            renderCards();
+        }
+
+        function openSubcardsModal(cardId) {
+            const card = currentCards.find(c => c.id === cardId);
+            if (!card) return;
+
+            const subcardsModal = document.getElementById('subcards-modal');
+            const subcardsContainer = document.getElementById('subcards-container');
+            const subcardsModalTitle = document.getElementById('subcards-modal-title');
+            const addSubcardForm = document.getElementById('add-subcard-form');
+
+            subcardsModalTitle.textContent = `Subcards for "${card.question}"`;
+            
+            function renderSubcards() {
+                subcardsContainer.innerHTML = '';
+                if (card.subcards && card.subcards.length > 0) {
+                    card.subcards.forEach(subcard => {
+                        const subcardEl = document.createElement('div');
+                        subcardEl.className = 'subcard';
+                        subcardEl.dataset.id = subcard.id;
+                        subcardEl.innerHTML = `
+                            <div>
+                                <div class="subcard-question">${subcard.question}</div>
+                                <div class="subcard-answer">${subcard.answer}</div>
+                            </div>
+                            <div class="subcard-actions">
+                                <button class="edit-subcard-btn"><i class="fas fa-edit"></i></button>
+                                <button class="delete-subcard-btn"><i class="fas fa-trash"></i></button>
+                            </div>
+                        `;
+                        subcardsContainer.appendChild(subcardEl);
+                    });
+                } else {
+                    subcardsContainer.innerHTML = '<p>No subcards yet. Add one below!</p>';
+                }
+            }
+
+            renderSubcards();
+            
+            subcardsModal.style.display = 'flex';
+
+            const closeBtn = subcardsModal.querySelector('.close-btn');
+            closeBtn.onclick = () => subcardsModal.style.display = 'none';
+            
+            const addSubcardHandler = (e) => {
+                e.preventDefault();
+                const questionInput = document.getElementById('subcard-question');
+                const answerInput = document.getElementById('subcard-answer');
+                const question = questionInput.value.trim();
+                const answer = answerInput.value.trim();
+                if (question && answer) {
+                    if (!card.subcards) card.subcards = [];
+                    card.subcards.push({
+                        id: `sub-${Date.now()}`,
+                        question,
+                        answer
+                    });
+                    saveCards();
+                    renderSubcards();
+                    questionInput.value = '';
+                    answerInput.value = '';
+                }
+            };
+            
+            addSubcardForm.removeEventListener('submit', addSubcardHandler);
+            addSubcardForm.addEventListener('submit', addSubcardHandler);
+
+            subcardsContainer.addEventListener('click', (e) => {
+                const subcardEl = e.target.closest('.subcard');
+                if (!subcardEl) return;
+                const subcardId = subcardEl.dataset.id;
+
+                if (e.target.closest('.delete-subcard-btn')) {
+                    card.subcards = card.subcards.filter(sc => sc.id !== subcardId);
+                    saveCards();
+                    renderSubcards();
+                }
+                
+                if (e.target.closest('.edit-subcard-btn')) {
+                    const questionDiv = subcardEl.querySelector('.subcard-question');
+                    const answerDiv = subcardEl.querySelector('.subcard-answer');
+                    
+                    const originalQuestion = questionDiv.textContent;
+                    const originalAnswer = answerDiv.textContent;
+                    
+                    subcardEl.innerHTML = `
+                        <div>
+                            <input type="text" class="edit-subcard-question" value="${originalQuestion}">
+                            <input type="text" class="edit-subcard-answer" value="${originalAnswer}">
+                        </div>
+                        <div class="subcard-actions">
+                            <button class="save-subcard-btn"><i class="fas fa-save"></i></button>
+                        </div>
+                    `;
+                    
+                    subcardEl.querySelector('.save-subcard-btn').addEventListener('click', () => {
+                        const newQuestion = subcardEl.querySelector('.edit-subcard-question').value.trim();
+                        const newAnswer = subcardEl.querySelector('.edit-subcard-answer').value.trim();
+                        
+                        const subcard = card.subcards.find(sc => sc.id === subcardId);
+                        if (subcard && newQuestion && newAnswer) {
+                            subcard.question = newQuestion;
+                            subcard.answer = newAnswer;
+                            saveCards();
+                            renderSubcards();
+                        }
+                    });
+                }
+            });
+        }
+
+        function shuffleCards() {
+            for (let i = currentCards.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentCards[i], currentCards[j]] = [currentCards[j], currentCards[i]];
+            }
+            saveCards();
+            renderCards();
+        }
+
+        // --- Swipe Logic ---
+        function initSwipe() {
+            const cards = document.querySelectorAll('.card');
+            if (cards.length > 0) {
+                const topCard = cards[cards.length - 1];
+                topCard.addEventListener('mousedown', startDrag);
+                topCard.addEventListener('touchstart', startDrag, { passive: true });
+            }
+        }
+
+        function startDrag(e) {
+            if (activeCard) return;
+            activeCard = this;
+            activeCard.style.cursor = 'grabbing';
+            activeCard.style.transition = 'none'; // Remove transition while dragging
+
+            // Store the initial viewport coordinates of the touch/click
+            startX = e.clientX || e.touches[0].clientX;
+            startY = e.clientY || e.touches[0].clientY;
+            
+            // Reset movement trackers
+            moveX = 0;
+            moveY = 0;
+            
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('touchmove', drag, { passive: false });
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+        }
+
+        function drag(e) {
+            if (!activeCard) return;
+            e.preventDefault();
+
+            // Calculate the distance moved from the start position
+            const currentX = e.clientX || e.touches[0].clientX;
+            const currentY = e.clientY || e.touches[0].clientY;
+            moveX = currentX - startX;
+            moveY = currentY - startY;
+            
+            // Apply the transform to make the card follow the finger/cursor
+            const rotate = moveX / 20; // Add a slight rotation effect
+            activeCard.style.transform = `translateX(${moveX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
+        }
+
+        function endDrag() {
+            if (!activeCard) return;
+            
+            document.removeEventListener('mousemove', drag);
+            document.removeEventListener('touchmove', drag);
+            document.removeEventListener('mouseup', endDrag);
+            document.removeEventListener('touchend', endDrag);
+
+            activeCard.style.cursor = 'grab';
+            activeCard.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)'; // Re-add transition for snap back
+
+            const decisionThreshold = 100;
+            const isTap = Math.abs(moveX) < 5 && Math.abs(moveY) < 5;
+
+            if (isTap) {
+                flipCard(activeCard);
+                activeCard.style.transform = ''; // Reset transform if it was a tap
+            } else if (Math.abs(moveX) > decisionThreshold) {
+                // Swipe the card off-screen
+                const direction = moveX > 0 ? 1 : -1;
+                swipeCard(direction);
+            } else {
+                // Snap the card back to its original position
+                activeCard.style.transform = '';
+            }
+            
+            activeCard = null;
+        }
+
+        function swipeCard(direction) {
+            if (!activeCard) {
+                const cards = document.querySelectorAll('.card');
+                if (cards.length === 0) return;
+                activeCard = cards[cards.length - 1];
+            }
+            
+            const flyoutX = (direction > 0 ? 1 : -1) * (window.innerWidth * 0.75);
+            const rotate = flyoutX / 20;
+            
+            activeCard.style.transform = `translateX(${flyoutX}px) translateY(${moveY}px) rotate(${rotate}deg)`;
+
+            setTimeout(() => {
+                const cardId = activeCard.dataset.id;
+                const cardIndex = currentCards.findIndex(c => c.id === cardId);
+                if (cardIndex > -1) {
+                    // Move card to the back of the deck instead of deleting
+                    const [swipedCard] = currentCards.splice(cardIndex, 1);
+                    currentCards.unshift(swipedCard);
+                }
+                saveCards();
+                renderCards();
+            }, 300);
+        }
+
+        // --- Event Listeners ---
+        addCardBtn.addEventListener('click', openAddModal);
+        closeModalBtn.addEventListener('click', closeModal);
+        addEditForm.addEventListener('submit', handleFormSubmit);
+        shuffleBtn.addEventListener('click', shuffleCards);
+        categoryFilter.addEventListener('change', renderCards);
+        likeBtn.addEventListener('click', () => swipeCard(1));
+        dislikeBtn.addEventListener('click', () => swipeCard(-1));
+
+        window.addEventListener('click', (e) => {
+            if (e.target === modal || e.target.closest('.modal') && e.target.classList.contains('close-btn')) {
+                closeModal();
+            }
+            if (e.target === document.getElementById('subcards-modal') || e.target.closest('#subcards-modal .close-btn')) {
+                 document.getElementById('subcards-modal').style.display = 'none';
+            }
+        });
+
+        // --- Initial Load ---
+        loadCards();
+    });
     </script>
-  </body>
+</body>
 </html>
