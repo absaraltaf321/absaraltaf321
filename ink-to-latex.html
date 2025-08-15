@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ABS Flashcards System</title>
   <!-- Elegant font from Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500&display=swap" rel="stylesheet">
@@ -18,6 +19,9 @@
     });
   </script>
  <style>
+    * {
+        box-sizing: border-box;
+    }
     /* Header Styling */
 /* Define CSS Variables for Consistency and Maintainability */
 :root {
@@ -1097,16 +1101,19 @@ body {
   }
 }
 
-/* On very small screens, switch to 1-column */
+/* On very small screens, switch to 3x3 grid */
 @media (max-width: 600px) {
   .button-panel {
-    display: flex;
-    flex-direction: column;
-    padding: 20px;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 15px;
+    gap: 10px;
   }
   
   .button-panel button {
+    height: 80px; /* Adjust height for a more square look */
+    clip-path: none; /* Remove hexagonal clip-path */
+    border-radius: 8px; /* Add standard border-radius */
     margin-bottom: 0;
     transform: none !important;
   }
@@ -1286,7 +1293,7 @@ body {
     }
 
     body {
-        padding: 20px;
+        padding: 15px;
     }
 
     .controls {
@@ -1327,6 +1334,10 @@ body {
 }
 
 @media (max-width: 480px) {
+    .input-panel {
+        padding: 15px;
+    }
+
     .controls {
         padding: 20px;
     }
@@ -2090,9 +2101,91 @@ body {
 .category-view-back:hover {
   background: linear-gradient(135deg, #ff8787, #ff6565);
 }
+
+/* Mobile Controls */
+#mobile-controls-trigger {
+  display: none; /* Hidden by default */
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 24px;
+  line-height: 60px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  z-index: 1001;
+}
+
+@media (max-width: 767px) {
+  /* Hide the button panel in the normal flow on mobile, and show the trigger */
+  .panel-wrapper .button-panel-wrapper {
+    display: none;
+  }
+  #mobile-controls-trigger {
+    display: block;
+  }
+
+  /* When the floating button is clicked, show the wrapper as a fixed-position panel */
+  .button-panel-wrapper.mobile-controls-active {
+    display: block;
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: auto;
+    z-index: 1000;
+  }
+
+  /* Style the button panel grid *inside* the active floating panel */
+  .button-panel-wrapper.mobile-controls-active .button-panel {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    /* Override other styles from wider media queries */
+    width: auto;
+    flex-direction: unset;
+  }
+
+  /* Style the buttons *inside* the active floating panel */
+  .button-panel-wrapper.mobile-controls-active .button-panel button {
+    width: 70px;
+    height: 70px;
+    clip-path: none;
+    border-radius: 12px;
+    font-size: 10px;
+    line-height: 1.2;
+    padding: 4px;
+    /* Override styles from wider media queries */
+    margin: 0;
+    transform: none !important;
+  }
+
+  /* Handle the category section inside the popup */
+  .button-panel-wrapper.mobile-controls-active .category-section {
+      grid-column: 1 / -1; /* Span all columns */
+      margin-top: 5px;
+      transform: none;
+      padding: 0;
+      width: 100%;
+      background: transparent;
+      box-shadow: none;
+  }
+}
   </style>
 </head>
 <body>
+  <button id="mobile-controls-trigger">&#9776;</button> <!-- Hamburger Icon -->
+
   <header>
     <h1>ABS Flashcards</h1>
   </header>
@@ -2107,28 +2200,30 @@ body {
       <option value="all">Made for desktop only</option>
     </div>
     
-    <div class="button-panel">
-      <button onclick="addNewNote()">Add Note</button>
-      
-      <button onclick="shuffleCards()">Shuffle Cards</button>
-      
-      <button onclick="addNewCard()">Add Card</button>
-      
-      <button onclick="enterConnexionMode()">Make Connexions</button>
-      
-      <button onclick="startPracticeMode()">Let's Practice</button>
-      
-      <button id="importBtn" onclick="document.getElementById('importFile').click()">Import Cards</button>
-      
-      <button id="exportBtn" onclick="exportCards()">Export Cards</button>
-      
-      <input type="file" id="importFile" accept=".json" onchange="importCards(event)" style="display: none;">
-      <div class="category-section">
-        <h3>Filter by Category</h3>
-        <select id="filterCategory" onchange="renderCards()">
-          <option value="all">Show All Categories</option>
-        </select>
-      </div>
+    <div class="button-panel-wrapper">
+        <div class="button-panel">
+        <button onclick="addNewNote()">Add Note</button>
+        
+        <button onclick="shuffleCards()">Shuffle Cards</button>
+        
+        <button onclick="addNewCard()">Add Card</button>
+        
+        <button onclick="enterConnexionMode()">Make Connexions</button>
+        
+        <button onclick="startPracticeMode()">Let's Practice</button>
+        
+        <button id="importBtn" onclick="document.getElementById('importFile').click()">Import Cards</button>
+        
+        <button id="exportBtn" onclick="exportCards()">Export Cards</button>
+        
+        <input type="file" id="importFile" accept=".json" onchange="importCards(event)" style="display: none;">
+        <div class="category-section">
+            <h3>Filter by Category</h3>
+            <select id="filterCategory" onchange="renderCards()">
+            <option value="all">Show All Categories</option>
+            </select>
+        </div>
+        </div>
     </div>
   </div>
 <div class="fullscreen-wrapper">
@@ -5263,6 +5358,17 @@ function resetButtonPanel() {
   buttonPanel.offsetHeight; // Trigger reflow
   buttonPanel.style.display = '';
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    const mobileControlsTrigger = document.getElementById('mobile-controls-trigger');
+    const buttonPanelWrapper = document.querySelector('.button-panel-wrapper');
+
+    if (mobileControlsTrigger && buttonPanelWrapper) {
+        mobileControlsTrigger.addEventListener('click', () => {
+            buttonPanelWrapper.classList.toggle('mobile-controls-active');
+        });
+    }
+});
 </script> 
 </body>
 </html>
