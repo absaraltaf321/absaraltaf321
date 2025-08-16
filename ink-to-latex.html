@@ -41,6 +41,12 @@
     --input-padding: 12px 18px;
     --font-size-base: 15px;
     --font-weight-medium: 500;
+    --cat-gradient-1: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+    --cat-gradient-2: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
+    --cat-gradient-3: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
+    --cat-gradient-4: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+    --cat-gradient-5: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --cat-gradient-6: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
 }
 
 /* Header Styles */
@@ -61,6 +67,27 @@ header h1 {
 @keyframes glow {
     0% { text-shadow: 0 0 10px rgba(0, 0, 0, 0.1); }
     100% { text-shadow: 0 0 20px rgba(0, 0, 0, 0.2); }
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.view-container {
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+}
+
+.view-hidden {
+    opacity: 0;
+    visibility: hidden;
+    display: none;
 }
 
 /* Global Styles */
@@ -140,6 +167,46 @@ body {
     padding: 20px;
 }
 
+.category-holder-card {
+    background: linear-gradient(145deg, #ffffff, #f5f7fa);
+    color: var(--text-color);
+    border-radius: var(--border-radius);
+    padding: 32px 24px;
+    min-width: 340px;
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), box-shadow 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--border-color);
+    transform-style: preserve-3d;
+    animation: card-fade-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.category-holder-card:hover {
+    transform: translateY(-5px) scale(1.05) rotateX(10deg) rotateY(5deg);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+}
+
+.back-to-categories-btn {
+    padding: 12px 24px;
+    background: var(--primary-color);
+    border: none;
+    border-radius: var(--border-radius);
+    color: white;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-duration) ease;
+    box-shadow: var(--box-shadow);
+    margin-bottom: 20px;
+    display: none; /* Initially hidden */
+}
+
 /* Flashcard Styling */
 .flashcard {
     min-width: 340px;
@@ -153,6 +220,7 @@ body {
     margin: 15px;
     flex: 1 1 auto;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
+    animation: card-fade-in 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
 }
 
 .flashcard-inner {
@@ -2230,7 +2298,9 @@ body {
   <button id="fullscreenBtn" class="fullscreen-button">Fullscreen View</button>
 </div>
 
-  <div class="flashcard-container" id="cardContainer"></div>
+  <button id="backToCategoriesBtn" class="back-to-categories-btn" onclick="showCategoryView()">Back to Categories</button>
+  <div id="categoryHolderContainer" class="flashcard-container view-container"></div>
+  <div class="flashcard-container view-container view-hidden" id="cardContainer"></div>
   <div id="connexionCanvas"></div>
   
   <!-- Modal for Subcards (initially hidden) -->
@@ -2354,8 +2424,8 @@ function renderCards() {
   const filteredCards = filterValue === 'all'
     ? currentCards
     : currentCards.filter(card => card.category === filterValue);
-  filteredCards.forEach(card => {
-    container.appendChild(createCard(card));
+  filteredCards.forEach((card, index) => {
+    container.appendChild(createCard(card, index));
   });
   updateCategoryLists();
 }
@@ -2433,6 +2503,34 @@ function loadConnections() {
 
 function saveConnections() {
   localStorage.setItem('connections', JSON.stringify(connections));
+}
+
+function renderCategoryHolders() {
+  const container = document.getElementById('categoryHolderContainer');
+  container.innerHTML = '';
+  const categories = [...new Set(currentCards.map(card => card.category || 'Uncategorized'))];
+  
+  categories.forEach((category, index) => {
+    const card = document.createElement('div');
+    card.className = 'category-holder-card';
+    card.style.background = `var(--cat-gradient-${(index % 6) + 1})`;
+    card.style.animationDelay = `${index * 100}ms`;
+    card.textContent = category;
+    card.onclick = () => {
+      document.getElementById('categoryHolderContainer').classList.add('view-hidden');
+      document.getElementById('cardContainer').classList.remove('view-hidden');
+      document.getElementById('backToCategoriesBtn').style.display = 'block';
+      document.getElementById('filterCategory').value = category;
+      renderCards();
+    };
+    container.appendChild(card);
+  });
+}
+
+function showCategoryView() {
+  document.getElementById('categoryHolderContainer').classList.remove('view-hidden');
+  document.getElementById('cardContainer').classList.add('view-hidden');
+  document.getElementById('backToCategoriesBtn').style.display = 'none';
 }
 
 /******************************
@@ -3103,8 +3201,9 @@ function createSubcardForModal(subcard) {
 /******************************
  * Card Creation Functions    *
  ******************************/
-function createCard(card) {
+function createCard(card, index) {
   const cardElement = document.createElement('div');
+  cardElement.style.animationDelay = `${index * 100}ms`;
   cardElement.className = 'flashcard';
   if (card.type === "note") cardElement.classList.add("note");
   cardElement.dataset.cardId = card.id;
@@ -5337,6 +5436,7 @@ document.addEventListener('DOMContentLoaded', function() {
 window.onload = function() {
   loadCards();
   loadConnections();
+  renderCategoryHolders();
 };
 
 // Add a new function to reset the button panel
