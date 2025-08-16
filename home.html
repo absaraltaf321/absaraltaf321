@@ -446,6 +446,63 @@
             color: var(--text-secondary);
             margin: 0;
         }
+
+        .initial-view-container {
+            display: flex;
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+            justify-content: center;
+        }
+
+        .recent-files-section, .upload-section {
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius-lg);
+            border: 1px solid var(--border-color);
+            padding: 2rem;
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .recent-files-section h2, .upload-section h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0 0 1.5rem 0;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #recentFilesList {
+            list-style: none;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+
+        #recentFilesList li {
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius-sm);
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        #recentFilesList li:hover {
+            background: var(--bg-primary);
+        }
+
+        #recentFilesList .file-icon {
+            color: var(--accent-primary);
+        }
+
+        #noRecentFilesMessage {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 2rem 0;
+        }
         
         /* ===== FEATURE-SPECIFIC STYLES ===== */
         .bookmark-icon {
@@ -484,6 +541,21 @@
             .controls-panel { bottom: 1rem; right: 1rem; top: auto; transform: none; opacity: 0; transform: translateY(100px); }
             .controls-panel.visible { opacity: 1; transform: translateY(0); }
             .floating-section, .reading-stats { display: none; }
+
+            .initial-view-container {
+                flex-direction: column;
+                height: auto;
+                padding: 2rem 1rem;
+                gap: 1.5rem;
+            }
+            .recent-files-section, .upload-section {
+                width: 100%;
+                padding: 1.5rem;
+                box-shadow: var(--shadow-light);
+            }
+            .recent-files-section h2, .upload-section h2 {
+                font-size: 1.25rem;
+            }
         }
 
         /* ===== ANIMATIONS ===== */
@@ -587,11 +659,23 @@
     <main class="main" id="main">
         <div class="content-wrapper" id="contentWrapper">
             <div class="markdown-content" id="markdownContent">
-                <!-- Initial Upload Box -->
-                <div class="upload-box" id="mainUploadBox">
-                    <span class="upload-icon">📁</span>
-                    <span class="upload-text">Upload Document</span>
-                    <p class="upload-subtext">or drag and drop a file</p>
+                <!-- Initial View Container -->
+                <div class="initial-view-container" id="initialViewContainer">
+                    <div class="recent-files-section">
+                        <h2>Recent Files</h2>
+                        <ul id="recentFilesList">
+                            <!-- Recent files will be populated by JS -->
+                        </ul>
+                        <p id="noRecentFilesMessage" style="display: none;">No recent files found.</p>
+                    </div>
+                    <div class="upload-section">
+                        <h2>New Document</h2>
+                        <div class="upload-box" id="mainUploadBox">
+                            <span class="upload-icon">📁</span>
+                            <span class="upload-text">Upload Document</span>
+                            <p class="upload-subtext">or drag and drop a file</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -694,6 +778,8 @@
     <!-- Selection Pop-up Menu -->
     <div id="selectionPopup" class="selection-popup">
         <button id="highlightBtn" class="btn">Highlight</button>
+        <button id="boldBtn" class="btn">Bold</button>
+        <button id="underlineBtn" class="btn">Underline</button>
         <button id="flashcardBtn" class="btn">Create Flashcard</button>
     </div>
     
@@ -769,7 +855,7 @@
                     'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'appModal',
                     'modalTitle', 'modalBody', 'searchInput', 'searchContainer',
                     'printBtn', 'exportPdfBtn', 'clearRecentsBtn',
-                    'selectionPopup', 'highlightBtn', 'flashcardBtn'
+                    'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn', 'flashcardBtn'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -783,6 +869,7 @@
                 this.applySettings();
                 this.loadFilesFromStorage();
                 this.updateFileSelect();
+                this.populateRecentFilesList();
                 this.setupCustomRenderer();
             }
 
@@ -899,6 +986,8 @@
 
                 this.elements.markdownContent.addEventListener('mouseup', (e) => this.handleTextSelection(e));
                 this.elements.highlightBtn.addEventListener('click', () => this.highlightSelection());
+                this.elements.boldBtn.addEventListener('click', () => this.formatSelection('b'));
+                this.elements.underlineBtn.addEventListener('click', () => this.formatSelection('u'));
                 this.elements.flashcardBtn.addEventListener('click', () => this.createFlashcardFromSelection());
             }
 
@@ -930,6 +1019,41 @@
                         selection.removeAllRanges();
                         this.hideSelectionPopup();
                     }
+                }
+            }
+
+            formatSelection(tag) {
+                const selection = window.getSelection();
+                if (selection && !selection.isCollapsed) {
+                    try {
+                        const range = selection.getRangeAt(0);
+                        const element = document.createElement(tag);
+                        range.surroundContents(element);
+                    } catch (e) {
+                        console.error(`Could not format selection with <${tag}>, it may span across multiple HTML elements.`, e);
+                        this.showError(`Formatting failed. Please select text within a single block.`);
+                    } finally {
+                        selection.removeAllRanges();
+                        this.hideSelectionPopup();
+                    }
+                }
+            }
+
+            populateRecentFilesList() {
+                const list = document.getElementById('recentFilesList');
+                const message = document.getElementById('noRecentFilesMessage');
+                list.innerHTML = '';
+
+                if (this.state.files.size > 0) {
+                    this.state.files.forEach((file, filename) => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<span class="file-icon">📄</span> <span>${filename}</span>`;
+                        li.onclick = () => this.loadFile(filename);
+                        list.appendChild(li);
+                    });
+                    message.style.display = 'none';
+                } else {
+                    message.style.display = 'block';
                 }
             }
 
