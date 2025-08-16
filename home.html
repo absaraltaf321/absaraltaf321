@@ -337,10 +337,21 @@
         input:checked + .switch-slider:before { transform: translateX(18px); }
 
         /* ===== MODALS & OVERLAYS ===== */
-        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-        .modal.active { opacity: 1; pointer-events: all; }
-        .modal-content { background: var(--bg-primary); border-radius: var(--border-radius-lg); padding: 2rem; max-width: 90vw; max-height: 90vh; overflow: auto; box-shadow: var(--shadow-heavy); transform: scale(0.9); transition: transform 0.3s ease; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+        .modal.active { opacity: 1; pointer-events: all; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .modal-content { background: var(--bg-primary); border-radius: var(--border-radius-lg); padding: 2rem; max-width: 600px; width: 90%; box-shadow: var(--shadow-heavy); transform: scale(0.95); transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
         .modal.active .modal-content { transform: scale(1); }
+
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem; }
+        .modal-close-btn { background: none; border: none; font-size: 2rem; line-height: 1; cursor: pointer; color: var(--text-secondary); transition: color 0.2s; }
+        .modal-close-btn:hover { color: var(--text-primary); }
+        .modal-body { max-height: 60vh; overflow-y: auto; }
+        
+        #modalRecentFilesList { list-style: none; }
+        #modalRecentFilesList li { padding: 0.75rem 1rem; border-radius: var(--border-radius-sm); cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 1rem; }
+        #modalRecentFilesList li:hover { background: var(--bg-secondary); }
+        #modalRecentFilesList .file-icon { color: var(--accent-primary); }
+
         .lightbox { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.95); display: flex; align-items: center; justify-content: center; z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .lightbox.active { opacity: 1; pointer-events: all; }
         .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--border-radius); }
@@ -441,67 +452,47 @@
             margin-bottom: 0.5rem;
         }
 
-        .upload-box .upload-subtext {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            margin: 0;
-        }
-
         .initial-view-container {
             display: flex;
             gap: 2rem;
-            width: 100%;
-            max-width: 1200px;
             justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 2rem;
         }
 
-        .recent-files-section, .upload-section {
+        .initial-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 250px;
+            height: 250px;
             background: var(--bg-secondary);
             border-radius: var(--border-radius-lg);
             border: 1px solid var(--border-color);
-            padding: 2rem;
-            width: 50%;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .recent-files-section h2, .upload-section h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0 0 1.5rem 0;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        #recentFilesList {
-            list-style: none;
-            overflow-y: auto;
-            max-height: 400px;
-        }
-
-        #recentFilesList li {
-            padding: 0.75rem 1rem;
-            border-radius: var(--border-radius-sm);
             cursor: pointer;
-            transition: background 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
+            transition: all 0.3s ease;
+            text-align: center;
+            padding: 2rem;
         }
 
-        #recentFilesList li:hover {
-            background: var(--bg-primary);
+        .initial-box:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-medium);
+            border-color: var(--accent-primary);
         }
 
-        #recentFilesList .file-icon {
+        .box-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
             color: var(--accent-primary);
         }
 
-        #noRecentFilesMessage {
-            text-align: center;
-            color: var(--text-secondary);
-            padding: 2rem 0;
+        .box-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
         }
         
         /* ===== FEATURE-SPECIFIC STYLES ===== */
@@ -543,13 +534,10 @@
             .floating-section, .reading-stats { display: none; }
 
             .initial-view-container {
-                flex-direction: column;
-                height: auto;
                 padding: 2rem 1rem;
                 gap: 1.5rem;
             }
             .recent-files-section, .upload-section {
-                width: 100%;
                 padding: 1.5rem;
                 box-shadow: var(--shadow-light);
             }
@@ -661,20 +649,13 @@
             <div class="markdown-content" id="markdownContent">
                 <!-- Initial View Container -->
                 <div class="initial-view-container" id="initialViewContainer">
-                    <div class="recent-files-section">
-                        <h2>Recent Files</h2>
-                        <ul id="recentFilesList">
-                            <!-- Recent files will be populated by JS -->
-                        </ul>
-                        <p id="noRecentFilesMessage" style="display: none;">No recent files found.</p>
+                    <div class="initial-box" id="mainUploadBox">
+                        <span class="box-icon">📁</span>
+                        <span class="box-text">Upload Document</span>
                     </div>
-                    <div class="upload-section">
-                        <h2>New Document</h2>
-                        <div class="upload-box" id="mainUploadBox">
-                            <span class="upload-icon">📁</span>
-                            <span class="upload-text">Upload Document</span>
-                            <p class="upload-subtext">or drag and drop a file</p>
-                        </div>
+                    <div class="initial-box" id="recentFilesBox">
+                        <span class="box-icon">📄</span>
+                        <span class="box-text">Recent Files</span>
                     </div>
                 </div>
             </div>
@@ -766,6 +747,22 @@
         <div class="drop-message">📁 Drop your Markdown files here</div>
     </div>
 
+    <!-- Recent Files Modal -->
+    <div class="modal" id="recentFilesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Recent Files</h2>
+                <button class="modal-close-btn" id="closeRecentFilesModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <ul id="modalRecentFilesList">
+                    <!-- Recent files will be populated by JS -->
+                </ul>
+                <p id="modalNoRecentFilesMessage" style="display: none;">No recent files found.</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal -->
     <div class="modal" id="appModal">
         <div class="modal-content">
@@ -849,13 +846,14 @@
             initializeElements() {
                 const ids = [
                     'fileInput', 'markdownContent', 'progressBar', 'sidebar', 'main', 
-                    'contentWrapper', 'floatingSection', 'readingStats', 
-                    'controlsPanel', 'lightbox', 'dropZone', 'zenScrollIndicator', 
-                    'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn', 
-                    'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'appModal',
+                    'contentWrapper', 'floatingSection', 'readingStats',
+                    'controlsPanel', 'lightbox', 'dropZone', 'zenScrollIndicator',
+                    'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn',
+                    'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'recentFilesBox', 'appModal',
                     'modalTitle', 'modalBody', 'searchInput', 'searchContainer',
                     'printBtn', 'exportPdfBtn', 'clearRecentsBtn',
-                    'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn', 'flashcardBtn'
+                    'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn', 'flashcardBtn',
+                    'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -869,7 +867,6 @@
                 this.applySettings();
                 this.loadFilesFromStorage();
                 this.updateFileSelect();
-                this.populateRecentFilesList();
                 this.setupCustomRenderer();
             }
 
@@ -921,6 +918,10 @@
                 if (this.elements.mainUploadBox) {
                     this.elements.mainUploadBox.addEventListener('click', () => this.elements.fileInput.click());
                 }
+                if (this.elements.recentFilesBox) {
+                    this.elements.recentFilesBox.addEventListener('click', () => this.openRecentFilesModal());
+                }
+                this.elements.closeRecentFilesModalBtn.addEventListener('click', () => this.closeRecentFilesModal());
 
                 this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
                 this.elements.searchInput.addEventListener('input', debounce(e => this.searchInDocument(e.target.value), 300));
@@ -1039,22 +1040,34 @@
                 }
             }
 
-            populateRecentFilesList() {
-                const list = document.getElementById('recentFilesList');
-                const message = document.getElementById('noRecentFilesMessage');
+            populateModalRecentFilesList() {
+                const list = this.elements.modalRecentFilesList;
+                const message = this.elements.modalNoRecentFilesMessage;
                 list.innerHTML = '';
 
                 if (this.state.files.size > 0) {
                     this.state.files.forEach((file, filename) => {
                         const li = document.createElement('li');
                         li.innerHTML = `<span class="file-icon">📄</span> <span>${filename}</span>`;
-                        li.onclick = () => this.loadFile(filename);
+                        li.onclick = () => {
+                            this.loadFile(filename);
+                            this.closeRecentFilesModal();
+                        };
                         list.appendChild(li);
                     });
                     message.style.display = 'none';
                 } else {
                     message.style.display = 'block';
                 }
+            }
+
+            openRecentFilesModal() {
+                this.populateModalRecentFilesList();
+                this.elements.recentFilesModal.classList.add('active');
+            }
+
+            closeRecentFilesModal() {
+                this.elements.recentFilesModal.classList.remove('active');
             }
 
             createFlashcardFromSelection() {
