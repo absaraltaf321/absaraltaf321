@@ -296,8 +296,8 @@
         .markdown-content pre code { background: none; padding: 1rem; display: block; overflow-x: auto; }
         .markdown-content img { max-width: 100%; height: auto; border-radius: var(--border-radius); box-shadow: var(--shadow-medium); margin: 2rem 0; cursor: pointer; transition: transform 0.3s ease; }
         .markdown-content img:hover { transform: scale(1.02); }
-        .markdown-content table { width: 100%; border-collapse: collapse; margin: 2rem 0; border-radius: var(--border-radius); overflow: hidden; box-shadow: var(--shadow-light); }
-        .markdown-content th, .markdown-content td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+        .markdown-content table { width: 100%; border-collapse: collapse; margin: 2rem 0; border-radius: var(--border-radius); overflow: hidden; box-shadow: var(--shadow-light); table-layout: fixed; }
+        .markdown-content th, .markdown-content td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); word-wrap: break-word; }
         .markdown-content th { background: var(--bg-secondary); font-weight: 600; }
         .markdown-content a { color: var(--accent-primary); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s ease; }
         .markdown-content a:hover { border-bottom-color: var(--accent-primary); }
@@ -351,6 +351,32 @@
         .drop-zone { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(102, 126, 234, 0.1); border: 3px dashed var(--accent-primary); display: flex; align-items: center; justify-content: center; z-index: 1500; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
         .drop-zone.active { opacity: 1; pointer-events: all; }
         .drop-message { background: var(--bg-primary); padding: 2rem 3rem; border-radius: var(--border-radius-lg); box-shadow: var(--shadow-heavy); text-align: center; font-size: 1.25rem; font-weight: 600; color: var(--accent-primary); }
+
+        /* ===== SELECTION POPUP ===== */
+        .selection-popup {
+            position: absolute;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            box-shadow: var(--shadow-medium);
+            z-index: 1200;
+            padding: 0.5rem;
+            display: none; /* Initially hidden */
+            gap: 0.5rem;
+        }
+        .selection-popup button {
+            background: transparent;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            border-radius: var(--border-radius-sm);
+            transition: background 0.2s;
+        }
+        .selection-popup button:hover {
+            background: var(--bg-secondary);
+        }
 
         /* ===== INITIAL VIEW ===== */
         .initial-view .header,
@@ -664,6 +690,12 @@
             <button class="btn btn-primary" onclick="closeModal('appModal')" style="float: right;">Close</button>
         </div>
     </div>
+
+    <!-- Selection Pop-up Menu -->
+    <div id="selectionPopup" class="selection-popup">
+        <button id="highlightBtn" class="btn">Highlight</button>
+        <button id="flashcardBtn" class="btn">Create Flashcard</button>
+    </div>
     
     <script>
         // ===== DEBOUNCE UTILITY =====
@@ -736,7 +768,8 @@
                     'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn', 
                     'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'appModal',
                     'modalTitle', 'modalBody', 'searchInput', 'searchContainer',
-                    'printBtn', 'exportPdfBtn', 'clearRecentsBtn'
+                    'printBtn', 'exportPdfBtn', 'clearRecentsBtn',
+                    'selectionPopup', 'highlightBtn', 'flashcardBtn'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -830,7 +863,7 @@
                     this.saveReadingPosition();
                     
                     if (!this.state.zenMode) {
-                        this.elements.header.classList.toggle('hidden', window.scrollY > this.state.lastScrollY && window.scrollY > 100);
+                        // this.elements.header.classList.toggle('hidden', window.scrollY > this.state.lastScrollY && window.scrollY > 100);
                         this.state.lastScrollY = window.scrollY;
                     }
                 }, 100);
@@ -859,7 +892,111 @@
                     if (!this.elements.menuToggleBtn.contains(e.target) && !this.elements.dropdownMenu.contains(e.target)) {
                         this.hideMenu();
                     }
+                    if (this.elements.selectionPopup && !this.elements.selectionPopup.contains(e.target)) {
+                        this.hideSelectionPopup();
+                    }
                 });
+
+                this.elements.markdownContent.addEventListener('mouseup', (e) => this.handleTextSelection(e));
+                this.elements.highlightBtn.addEventListener('click', () => this.highlightSelection());
+                this.elements.flashcardBtn.addEventListener('click', () => this.createFlashcardFromSelection());
+            }
+
+            handleTextSelection(event) {
+                setTimeout(() => { // Use timeout to allow click event to fire first on selection change
+                    const selection = window.getSelection();
+                    if (selection && !selection.isCollapsed && selection.toString().trim() !== '') {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        this.showSelectionPopup(rect);
+                    } else {
+                        // This is commented out to prevent the popup from disappearing when clicking a button inside it
+                        // this.hideSelectionPopup();
+                    }
+                }, 10);
+            }
+
+            highlightSelection() {
+                const selection = window.getSelection();
+                if (selection && !selection.isCollapsed) {
+                    try {
+                        const range = selection.getRangeAt(0);
+                        const mark = document.createElement('mark');
+                        range.surroundContents(mark);
+                    } catch (e) {
+                        console.error("Could not highlight selection, it may span across multiple HTML elements.", e);
+                        this.showError("Highlighting failed. Please select text within a single block.");
+                    } finally {
+                        selection.removeAllRanges();
+                        this.hideSelectionPopup();
+                    }
+                }
+            }
+
+            createFlashcardFromSelection() {
+                const selection = window.getSelection();
+                if (selection && !selection.isCollapsed) {
+                    const selectedText = selection.toString().trim();
+                    if (selectedText) {
+                        try {
+                            const savedCards = localStorage.getItem('flashcards');
+                            let cards = savedCards ? JSON.parse(savedCards) : [];
+
+                            const newCard = {
+                                id: `card-${Date.now()}-${Math.random()}`,
+                                category: 'From Document',
+                                question: selectedText,
+                                answer: '',
+                                type: 'card'
+                            };
+
+                            cards.push(newCard);
+                            localStorage.setItem('flashcards', JSON.stringify(cards));
+                            
+                            window.location.href = 'flashcards.html';
+                        } catch (e) {
+                            console.error("Could not create flashcard.", e);
+                            this.showError("Could not save the new flashcard. Local storage might be full or corrupted.");
+                        }
+                    }
+                    selection.removeAllRanges();
+                    this.hideSelectionPopup();
+                }
+            }
+
+            showSelectionPopup(rect) {
+                const popup = this.elements.selectionPopup;
+                if (!popup) return;
+
+                const contentWrapperRect = this.elements.contentWrapper.getBoundingClientRect();
+
+                popup.style.display = 'flex';
+                let top = rect.top + window.scrollY - popup.offsetHeight - 10;
+                let left = rect.left + window.scrollX + (rect.width / 2) - (popup.offsetWidth / 2);
+
+                // Keep popup within the content wrapper bounds horizontally
+                if (left < contentWrapperRect.left + window.scrollX) {
+                    left = contentWrapperRect.left + window.scrollX;
+                }
+                if (left + popup.offsetWidth > contentWrapperRect.right + window.scrollX) {
+                    left = contentWrapperRect.right + window.scrollX - popup.offsetWidth;
+                }
+                
+                // If popup would be above the viewport, show it below the selection instead
+                if (top < window.scrollY) {
+                    top = rect.bottom + window.scrollY + 10;
+                }
+
+
+                popup.style.top = `${top}px`;
+                popup.style.left = `${left}px`;
+            }
+
+            hideSelectionPopup() {
+                const popup = this.elements.selectionPopup;
+                if (popup) {
+                    popup.style.display = 'none';
+                }
             }
 
             // ===== FILE HANDLING =====
