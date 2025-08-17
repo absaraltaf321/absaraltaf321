@@ -161,6 +161,26 @@
             color: var(--text-primary);
             width: 100%;
         }
+        .search-controls {
+            display: none; /* Hidden by default */
+            align-items: center;
+            gap: 0.5rem;
+            margin-left: 0.5rem;
+        }
+        .search-controls.visible {
+            display: flex;
+        }
+        #searchCounter {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .search-controls button {
+            padding: 0.25rem;
+            font-size: 1rem;
+            line-height: 1;
+            min-width: 28px;
+        }
 
         .menu-container { position: relative; }
         .menu-toggle-btn {
@@ -296,12 +316,15 @@
         .markdown-content pre code { background: none; padding: 1rem; display: block; overflow-x: auto; }
         .markdown-content img { max-width: 100%; height: auto; border-radius: var(--border-radius); box-shadow: var(--shadow-medium); margin: 2rem 0; cursor: pointer; transition: transform 0.3s ease; }
         .markdown-content img:hover { transform: scale(1.02); }
-        .markdown-content table { width: 100%; border-collapse: collapse; margin: 2rem 0; border-radius: var(--border-radius); overflow: hidden; box-shadow: var(--shadow-light); table-layout: fixed; }
-        .markdown-content th, .markdown-content td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); word-wrap: break-word; }
+        .table-wrapper { overflow-x: auto; margin: 2rem 0; border-radius: var(--border-radius); box-shadow: var(--shadow-light); }
+        .markdown-content table { width: 100%; border-collapse: collapse; border-radius: 0; box-shadow: none; table-layout: auto; }
+        .markdown-content th, .markdown-content td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border-color); word-wrap: break-word; white-space: nowrap; }
         .markdown-content th { background: var(--bg-secondary); font-weight: 600; }
         .markdown-content a { color: var(--accent-primary); text-decoration: none; border-bottom: 1px solid transparent; transition: all 0.2s ease; }
         .markdown-content a:hover { border-bottom-color: var(--accent-primary); }
         .markdown-content mark { background-color: var(--accent-primary); color: white; padding: 0.1em; border-radius: 3px; }
+        .markdown-content mark.search-highlight { background-color: #f6e05e; color: #1a202c; }
+        .markdown-content mark.search-highlight.active { background-color: #ed8936; color: white; }
 
         /* ===== FOCUS MODE ===== */
         .focus-mode .markdown-content > * { opacity: 0.3; transition: opacity 0.3s ease; }
@@ -544,6 +567,10 @@
             .recent-files-section h2, .upload-section h2 {
                 font-size: 1.25rem;
             }
+            .markdown-content th, .markdown-content td {
+                padding: 0.75rem;
+                font-size: 0.9rem;
+            }
         }
 
         /* ===== ANIMATIONS ===== */
@@ -574,6 +601,11 @@
         <div class="search-container" id="searchContainer" style="display: none;">
             <span>🔍</span>
             <input type="search" id="searchInput" placeholder="Search in document...">
+            <div class="search-controls" id="searchControls">
+                <span id="searchCounter"></span>
+                <button id="searchPrevBtn" class="btn" title="Previous match">↑</button>
+                <button id="searchNextBtn" class="btn" title="Next match">↓</button>
+            </div>
         </div>
         <div class="menu-container">
             <button class="menu-toggle-btn" id="menuToggleBtn" title="Menu">☰</button>
@@ -602,16 +634,6 @@
                     <div class="dropdown-menu-item" id="toggleZen">
                         <span class="icon">🧘</span>
                         <span>Zen Mode (Z)</span>
-                    </div>
-                </div>
-                <div class="dropdown-menu-group">
-                     <div class="dropdown-menu-item" id="printBtn">
-                        <span class="icon">🖨️</span>
-                        <span>Print</span>
-                    </div>
-                    <div class="dropdown-menu-item" id="exportPdfBtn">
-                        <span class="icon">📄</span>
-                        <span>Export as PDF</span>
                     </div>
                 </div>
                 <div class="dropdown-menu-group">
@@ -777,7 +799,6 @@
         <button id="highlightBtn" class="btn">Highlight</button>
         <button id="boldBtn" class="btn">Bold</button>
         <button id="underlineBtn" class="btn">Underline</button>
-        <button id="flashcardBtn" class="btn">Create Flashcard</button>
     </div>
     
     <script>
@@ -834,7 +855,9 @@
                     sidebarOpen: false,
                     controlsVisible: false,
                     menuVisible: false,
-                    lastScrollY: 0
+                    lastScrollY: 0,
+                    searchResults: [],
+                    currentSearchIndex: -1
                 };
                 this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
@@ -850,9 +873,9 @@
                     'controlsPanel', 'lightbox', 'dropZone', 'zenScrollIndicator',
                     'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn',
                     'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'recentFilesBox', 'appModal',
-                    'modalTitle', 'modalBody', 'searchInput', 'searchContainer',
-                    'printBtn', 'exportPdfBtn', 'clearRecentsBtn',
-                    'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn', 'flashcardBtn',
+                    'modalTitle', 'modalBody', 'searchInput', 'searchContainer', 'searchControls', 
+                    'searchCounter', 'searchPrevBtn', 'searchNextBtn', 'clearRecentsBtn',
+                    'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn',
                     'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage'
                 ];
                 const elements = {};
@@ -925,6 +948,8 @@
 
                 this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
                 this.elements.searchInput.addEventListener('input', debounce(e => this.searchInDocument(e.target.value), 300));
+                this.elements.searchPrevBtn.addEventListener('click', () => this.navigateToSearchResult(false));
+                this.elements.searchNextBtn.addEventListener('click', () => this.navigateToSearchResult(true));
 
                 // Menu items
                 document.getElementById('toggleTheme').addEventListener('click', () => this.toggleTheme());
@@ -932,8 +957,6 @@
                 document.getElementById('toggleFocus').addEventListener('click', () => this.toggleFocusMode());
                 document.getElementById('toggleZen').addEventListener('click', () => this.toggleZenMode());
                 document.getElementById('toggleControls').addEventListener('click', () => this.toggleControls());
-                this.elements.printBtn.addEventListener('click', () => window.print());
-                this.elements.exportPdfBtn.addEventListener('click', () => this.exportToPdf());
                 this.elements.clearRecentsBtn.addEventListener('click', () => this.clearRecentFiles());
                 
                 // Controls Panel
@@ -986,10 +1009,10 @@
                 });
 
                 this.elements.markdownContent.addEventListener('mouseup', (e) => this.handleTextSelection(e));
+                this.elements.markdownContent.addEventListener('touchend', (e) => this.handleTextSelection(e));
                 this.elements.highlightBtn.addEventListener('click', () => this.highlightSelection());
                 this.elements.boldBtn.addEventListener('click', () => this.formatSelection('b'));
                 this.elements.underlineBtn.addEventListener('click', () => this.formatSelection('u'));
-                this.elements.flashcardBtn.addEventListener('click', () => this.createFlashcardFromSelection());
             }
 
             handleTextSelection(event) {
@@ -1068,37 +1091,6 @@
 
             closeRecentFilesModal() {
                 this.elements.recentFilesModal.classList.remove('active');
-            }
-
-            createFlashcardFromSelection() {
-                const selection = window.getSelection();
-                if (selection && !selection.isCollapsed) {
-                    const selectedText = selection.toString().trim();
-                    if (selectedText) {
-                        try {
-                            const savedCards = localStorage.getItem('flashcards');
-                            let cards = savedCards ? JSON.parse(savedCards) : [];
-
-                            const newCard = {
-                                id: `card-${Date.now()}-${Math.random()}`,
-                                category: 'From Document',
-                                question: selectedText,
-                                answer: '',
-                                type: 'card'
-                            };
-
-                            cards.push(newCard);
-                            localStorage.setItem('flashcards', JSON.stringify(cards));
-                            
-                            window.location.href = 'flashcards.html';
-                        } catch (e) {
-                            console.error("Could not create flashcard.", e);
-                            this.showError("Could not save the new flashcard. Local storage might be full or corrupted.");
-                        }
-                    }
-                    selection.removeAllRanges();
-                    this.hideSelectionPopup();
-                }
             }
 
             showSelectionPopup(rect) {
@@ -1214,6 +1206,7 @@
                     void this.elements.markdownContent.offsetWidth; // Trigger reflow
                     this.elements.markdownContent.classList.add('fade-in');
                     
+                    this.wrapTables();
                     this.generateSidebarContent();
                     this.updateReadingStats();
                     this.setupContentObservers();
@@ -1228,6 +1221,16 @@
                     console.error("Markdown Parsing Error:", error);
                     this.showError('Failed to render markdown. The file might be corrupted or contain unsupported syntax.');
                 }
+            }
+
+            wrapTables() {
+                const tables = this.elements.markdownContent.querySelectorAll('table');
+                tables.forEach(table => {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'table-wrapper';
+                    table.parentNode.insertBefore(wrapper, table);
+                    wrapper.appendChild(table);
+                });
             }
 
             // ===== CONTENT PROCESSING & OBSERVERS =====
@@ -1488,69 +1491,88 @@
             }
 
             searchInDocument(query) {
-                const content = this.elements.markdownContent;
-                // Simple search for now: find paragraphs containing the text.
-                // A more advanced implementation would use a proper highlighting library.
-                const paragraphs = content.querySelectorAll('p, li');
-                const results = [];
+                this.clearSearchHighlights();
                 if (query.trim().length < 2) {
-                    this.showModal("Search", "<p>Please enter at least 2 characters to search.</p>");
+                    this.elements.searchControls.classList.remove('visible');
+                    this.state.searchResults = [];
+                    this.state.currentSearchIndex = -1;
+                    this.updateSearchUI(); // clear counter
                     return;
-                };
+                }
 
-                paragraphs.forEach((p, index) => {
-                    if (p.textContent.toLowerCase().includes(query.toLowerCase())) {
-                        p.id = p.id || `search-result-${index}`;
-                        results.push({
-                            id: p.id,
-                            text: p.textContent.substring(0, 100) + '...'
-                        });
+                const content = this.elements.markdownContent;
+                const regex = new RegExp(query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+                const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null, false);
+                const textNodes = [];
+                while(walker.nextNode()) {
+                    if (!walker.currentNode.parentElement.closest('pre, code, script, style')) {
+                        textNodes.push(walker.currentNode);
+                    }
+                }
+
+                textNodes.forEach(node => {
+                    const text = node.nodeValue;
+                    if (regex.test(text)) {
+                        const newNode = document.createElement('span');
+                        newNode.innerHTML = text.replace(regex, match => `<mark class="search-highlight">${match}</mark>`);
+                        node.parentNode.replaceChild(newNode, node);
                     }
                 });
 
-                if (results.length > 0) {
-                    const resultsHtml = results.map(r => `<div class="result-item" onclick="app.scrollToElement('${r.id}')">${r.text}</div>`).join('');
-                    this.showModal("Search Results", `<div id="search-results-list">${resultsHtml}</div>`);
+                this.state.searchResults = content.querySelectorAll('mark.search-highlight');
+                this.elements.searchControls.classList.toggle('visible', this.state.searchResults.length > 0);
+
+                if (this.state.searchResults.length > 0) {
+                    this.state.currentSearchIndex = -1;
+                    this.navigateToSearchResult(true);
                 } else {
-                    this.showModal("Search Results", "<p>No results found.</p>");
+                    this.updateSearchUI();
                 }
+            }
+
+            navigateToSearchResult(next = true) {
+                if (this.state.searchResults.length === 0) return;
+
+                const current = this.state.searchResults[this.state.currentSearchIndex];
+                if (current) current.classList.remove('active');
+                
+                if (next) {
+                    this.state.currentSearchIndex = (this.state.currentSearchIndex + 1) % this.state.searchResults.length;
+                } else {
+                    this.state.currentSearchIndex = (this.state.currentSearchIndex - 1 + this.state.searchResults.length) % this.state.searchResults.length;
+                }
+                this.updateSearchUI();
+            }
+
+            updateSearchUI() {
+                if (this.state.searchResults.length === 0) {
+                    this.elements.searchCounter.textContent = '0/0';
+                    return;
+                }
+                this.elements.searchCounter.textContent = `${this.state.currentSearchIndex + 1}/${this.state.searchResults.length}`;
+                const targetElement = this.state.searchResults[this.state.currentSearchIndex];
+                if(targetElement) {
+                    targetElement.classList.add('active');
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+
+            clearSearchHighlights() {
+                const highlights = this.elements.markdownContent.querySelectorAll('mark.search-highlight');
+                highlights.forEach(mark => {
+                    const parent = mark.parentNode;
+                    if (parent) {
+                        // Replace the mark with its text content
+                        parent.replaceChild(document.createTextNode(mark.textContent), mark);
+                        // Normalize the parent to merge adjacent text nodes
+                        parent.normalize();
+                    }
+                });
             }
 
             scrollToElement(id) {
                 document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 closeModal('appModal');
-            }
-
-            exportToPdf() {
-                const { jsPDF } = window.jspdf;
-                const content = this.elements.markdownContent;
-                this.showModal("Exporting PDF", "<p>Please wait while the PDF is being generated...</p>");
-
-                html2canvas(content, {
-                    scale: 2, // Higher scale for better quality
-                    useCORS: true,
-                    backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg-primary').trim()
-                }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/png');
-                    const pdf = new jsPDF({
-                        orientation: 'portrait',
-                        unit: 'pt',
-                        format: 'a4'
-                    });
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = pdf.internal.pageSize.getHeight();
-                    const canvasWidth = canvas.width;
-                    const canvasHeight = canvas.height;
-                    const ratio = canvasHeight / canvasWidth;
-                    const height = pdfWidth * ratio;
-                    
-                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
-                    pdf.save(`${this.state.currentFile.replace('.md', '')}.pdf`);
-                    closeModal('appModal');
-                }).catch(err => {
-                    console.error("PDF Export Error:", err);
-                    this.showError("Could not export to PDF.");
-                });
             }
 
             toggleBookmark(id, event) {
