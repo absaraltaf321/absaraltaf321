@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -654,7 +655,7 @@
                </div>
             </div>
         </div>
-        <input type="file" id="fileInput" accept=".md,.txt" style="display: none;" multiple>
+        <input type="file" id="fileInput" accept=".md,.txt,.epub" style="display: none;" multiple>
     </header>
 
     <!-- Progress Bar -->
@@ -859,7 +860,7 @@
                     searchResults: [],
                     currentSearchIndex: -1
                 };
-                this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+                this.MAX_FILE_SIZE = 30 * 1024 * 1024; // 5 MB
 
                 this.elements = this.initializeElements();
                 this.init();
@@ -1135,10 +1136,10 @@
 
             async handleDrop(event) {
                 const files = Array.from(event.dataTransfer.files).filter(file => 
-                    file.type === 'text/markdown' || file.name.endsWith('.md') || file.name.endsWith('.txt')
+                    file.name.endsWith('.md') || file.name.endsWith('.txt') || file.name.endsWith('.epub')
                 );
                 if (files.length === 0) {
-                    this.showError('Please drop Markdown (.md) or text (.txt) files.');
+                    this.showError('Please drop Markdown (.md, .txt) or EPUB (.epub) files.');
                     return;
                 }
                 await this.processFiles(files);
@@ -1177,14 +1178,21 @@
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
+                        const isEpub = file.name.endsWith('.epub');
                         this.state.files.set(file.name, {
                             name: file.name,
-                            content: e.target.result
+                            content: e.target.result,
+                            type: isEpub ? 'epub' : 'markdown'
                         });
                         resolve();
                     };
                     reader.onerror = () => reject(new Error('Failed to read file: ' + file.name));
-                    reader.readAsText(file);
+                    
+                    if (file.name.endsWith('.epub')) {
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        reader.readAsText(file);
+                    }
                 });
             }
 
@@ -1197,6 +1205,16 @@
                 this.state.currentFile = filename;
                 const file = this.state.files.get(filename);
                 
+                this.elements.fileSelectInMenu.value = filename;
+
+                if (file.type === 'epub') {
+                    await this.loadEpub(file);
+                } else {
+                    await this.loadMarkdown(file);
+                }
+            }
+
+            async loadMarkdown(file) {
                 try {
                     const contentToParse = String(file.content || '');
                     const html = await marked.parse(contentToParse);
@@ -1211,16 +1229,214 @@
                     this.updateReadingStats();
                     this.setupContentObservers();
                     
-                    this.loadReadingPosition(); // This will scroll to the saved position
+                    this.loadReadingPosition();
                     
                     this.elements.readingStats.classList.add('visible');
                     this.elements.progressBar.classList.add('visible');
-                    this.elements.fileSelectInMenu.value = filename;
 
                 } catch (error) {
                     console.error("Markdown Parsing Error:", error);
                     this.showError('Failed to render markdown. The file might be corrupted or contain unsupported syntax.');
                 }
+            }
+
+            async loadEpub(file) {
+                this.showLoading();
+                console.log("Loading EPUB file:", file.name);
+                try {
+                    this.elements.markdownContent.innerHTML = `<div id="epub-content"></div>`;
+
+                    const zip = await JSZip.loadAsync(file.content);
+
+                    const containerXmlFile = zip.file("META-INF/container.xml");
+                    if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
+                    const containerXml = await containerXmlFile.async("string");
+                    const parser = new DOMParser();
+                    const containerDoc = parser.parseFromString(containerXml, "application/xml");
+                    const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
+                    if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
+                    
+                    const basePath = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : "";
+
+                    const opfFile = zip.file(opfPath);
+                    if (!opfFile) throw new Error(`.opf file not found at path: ${opfPath}`);
+                    const opfXml = await opfFile.async("string");
+                    const opfDoc = parser.parseFromString(opfXml, "application/xml");
+
+                    const manifest = {};
+                    const manifestItems = opfDoc.getElementsByTagName("item");
+                    for (const item of manifestItems) {
+                        const href = item.getAttribute("href");
+                        if (href) {
+                            manifest[item.getAttribute("id")] = {
+                                href: basePath + href,
+                                mediaType: item.getAttribute("media-type"),
+                                id: item.getAttribute("id")
+                            };
+                        }
+                    }
+
+                    const spine = [];
+                    const spineItems = opfDoc.getElementsByTagName("itemref");
+                    for (const item of spineItems) {
+                        spine.push(item.getAttribute("idref"));
+                    }
+                    
+                    // Store manifest and other data for TOC generation
+                    this.state.currentEpubManifest = manifest;
+                    this.state.zip = zip;
+                    const spineEl = opfDoc.getElementsByTagName("spine")[0];
+                    this.state.currentEpubNcxId = spineEl?.getAttribute("toc");
+
+                    // Process content
+                    const content = await this.aggregateEpubContent(zip, manifest, spine);
+                    
+                    const epubContentDiv = this.elements.markdownContent.querySelector('#epub-content');
+                    epubContentDiv.innerHTML = content.html;
+
+                    const existingStyle = document.getElementById('epub-styles');
+                    if (existingStyle) existingStyle.remove();
+                    const styleElement = document.createElement('style');
+                    styleElement.id = 'epub-styles';
+                    styleElement.textContent = content.css;
+                    document.head.appendChild(styleElement);
+                    
+                    this.generateSidebarContent(); // Now this needs to handle EPUBs
+                    this.updateReadingStats();
+                    this.setupContentObservers();
+                    this.loadReadingPosition();
+                    this.elements.readingStats.classList.add('visible');
+                    this.elements.progressBar.classList.add('visible');
+
+                } catch (error) {
+                    console.error("EPUB Loading Error:", error);
+                    this.showError(`Failed to load EPUB: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async aggregateEpubContent(zip, manifest, spine) {
+                let aggregatedHtml = '';
+                let aggregatedCss = '';
+                const parser = new DOMParser();
+
+                for (const id in manifest) {
+                    const item = manifest[id];
+                    if (item.mediaType === 'text/css') {
+                        const cssFile = zip.file(decodeURIComponent(item.href));
+                        if (cssFile) {
+                            const rawCss = await cssFile.async('string');
+                            aggregatedCss += this.scopeCss(rawCss, '#epub-content') + '\n';
+                        }
+                    }
+                }
+
+                for (const idref of spine) {
+                    const manifestItem = manifest[idref];
+                    if (!manifestItem || !manifestItem.href) continue;
+
+                    const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
+                    if (!htmlFile) continue;
+                    
+                    const rawHtml = await htmlFile.async('string');
+                    const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
+
+                    htmlDoc.querySelectorAll('script').forEach(s => s.remove());
+                    htmlDoc.querySelectorAll('link[rel="stylesheet"]').forEach(l => l.remove());
+                    
+                    const assetTags = htmlDoc.querySelectorAll('img[src], image[href]');
+                    for (const tag of assetTags) {
+                        const attr = tag.hasAttribute('src') ? 'src' : 'href';
+                        const relativePath = tag.getAttribute(attr);
+                        if (!relativePath) continue;
+
+                        try {
+                            const absolutePath = this.resolveEpubPath(manifestItem.href, relativePath);
+                            const assetFile = zip.file(decodeURIComponent(absolutePath));
+                            if (assetFile) {
+                                const mimeType = this.getMimeTypeFromPath(absolutePath);
+                                const blob = await assetFile.async('blob');
+                                const blobUrl = URL.createObjectURL(blob.slice(0, blob.size, mimeType));
+                                tag.setAttribute(attr, blobUrl);
+                            }
+                        } catch (e) {
+                            console.warn(`Could not process asset ${relativePath}: ${e}`);
+                        }
+                    }
+                    
+                    if (htmlDoc.body) {
+                        // Add an ID to the first element of each spine item for TOC navigation
+                        const firstElement = htmlDoc.body.firstElementChild;
+                        if (firstElement) {
+                            firstElement.id = `epub-section-${idref}`;
+                        }
+                        aggregatedHtml += htmlDoc.body.innerHTML;
+                    }
+                }
+
+                return { html: aggregatedHtml, css: aggregatedCss };
+            }
+            
+            getMimeTypeFromPath(path) {
+                const extension = path.split('.').pop().toLowerCase();
+                const mimeTypes = {
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'png': 'image/png',
+                    'gif': 'image/gif',
+                    'svg': 'image/svg+xml',
+                    'webp': 'image/webp'
+                };
+                return mimeTypes[extension] || 'application/octet-stream';
+            }
+
+            resolveEpubPath(htmlFilePath, relativeAssetPath) {
+                const pathParts = htmlFilePath.split('/');
+                pathParts.pop(); // remove filename
+
+                const assetParts = relativeAssetPath.split('/');
+                for (const part of assetParts) {
+                    if (part === '..') {
+                        if (pathParts.length > 0) pathParts.pop();
+                    } else if (part !== '.' && part !== '') {
+                        pathParts.push(part);
+                    }
+                }
+                return pathParts.join('/');
+            }
+
+            scopeCss(css, scope) {
+                // This is a simplified implementation but should handle many cases.
+                // It avoids trying to scope @-rules like @font-face or @keyframes.
+                // It works by splitting the CSS by `{` and `}`.
+                let scopedCss = '';
+                const parts = css.split(/([{}])/);
+                let depth = 0;
+                let selectors = [];
+
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    if (part === '{') {
+                        if (depth === 0) {
+                            const selectorGroup = parts[i - 1];
+                            if (!selectorGroup.trim().startsWith('@')) {
+                                selectors = selectorGroup.split(',').map(s => {
+                                    const trimmed = s.trim();
+                                    if (trimmed.toLowerCase() === 'body' || trimmed.toLowerCase() === 'html') {
+                                        return scope;
+                                    }
+                                    return `${scope} ${trimmed}`;
+                                });
+                                parts[i - 1] = selectors.join(', ');
+                            }
+                        }
+                        depth++;
+                    } else if (part === '}') {
+                        depth--;
+                    }
+                }
+                return parts.join('');
             }
 
             wrapTables() {
@@ -1235,13 +1451,28 @@
 
             // ===== CONTENT PROCESSING & OBSERVERS =====
             generateSidebarContent() {
-                this.elements.sidebar.innerHTML = ''; // Clear previous content
+                const file = this.state.files.get(this.state.currentFile);
+                if (!file) return;
 
-                const fileBookmarks = this.state.bookmarks[this.state.currentFile] || [];
-                const headings = this.elements.markdownContent.querySelectorAll('h1, h2, h3, h4');
+                // Reset sidebar
+                this.elements.sidebar.innerHTML = '';
+                
+                // Bookmarks are handled similarly for both, so let's do it here.
+                this.generateBookmarksList();
 
-                // Bookmarks Section
-                if (fileBookmarks.length > 0) {
+                if (file.type === 'epub') {
+                    this.generateEpubToc();
+                } else {
+                    this.generateMarkdownToc();
+                }
+                
+                // This needs to be called after content is on the page
+                this.updateBookmarkIcons();
+            }
+
+            generateBookmarksList() {
+                 const fileBookmarks = this.state.bookmarks[this.state.currentFile] || [];
+                 if (fileBookmarks.length > 0) {
                     const bookmarksTitle = document.createElement('div');
                     bookmarksTitle.className = 'toc-title';
                     bookmarksTitle.textContent = 'Bookmarks';
@@ -1252,7 +1483,7 @@
                         if(heading) {
                             const bookmarkItem = document.createElement('div');
                             bookmarkItem.className = 'toc-item';
-                            bookmarkItem.innerHTML = `<span>${heading.textContent}</span>`;
+                            bookmarkItem.innerHTML = `<span>${heading.textContent.replace('☆', '').replace('★', '').trim()}</span>`;
                             bookmarkItem.onclick = () => {
                                 heading.scrollIntoView({ behavior: 'smooth' });
                                 if (this.state.sidebarOpen) this.toggleSidebar();
@@ -1261,8 +1492,10 @@
                         }
                     });
                 }
-                
-                // TOC Section
+            }
+
+            generateMarkdownToc() {
+                const headings = this.elements.markdownContent.querySelectorAll('h1, h2, h3, h4');
                 if (headings.length > 0) {
                     const tocTitle = document.createElement('div');
                     tocTitle.className = 'toc-title';
@@ -1271,7 +1504,7 @@
                     
                     headings.forEach(heading => {
                         const level = parseInt(heading.tagName.charAt(1));
-                        const text = heading.textContent;
+                        const text = heading.textContent.replace('☆', '').replace('★', '').trim();
                         const id = heading.id;
 
                         const tocItem = document.createElement('div');
@@ -1285,8 +1518,115 @@
                         this.elements.sidebar.appendChild(tocItem);
                     });
                 }
+            }
 
-                this.updateBookmarkIcons();
+            async generateEpubToc() {
+                const tocTitle = document.createElement('div');
+                tocTitle.className = 'toc-title';
+                tocTitle.textContent = 'Table of Contents';
+                this.elements.sidebar.appendChild(tocTitle);
+
+                const manifest = this.state.currentEpubManifest;
+                if (!manifest) return;
+
+                const navItem = Object.values(manifest).find(item => item.properties && item.properties.includes('nav'));
+
+                try {
+                    if (navItem) {
+                        const navFile = this.state.zip.file(decodeURIComponent(navItem.href));
+                        if (navFile) {
+                            const navHtml = await navFile.async('string');
+                            const parser = new DOMParser();
+                            const navDoc = parser.parseFromString(navHtml, 'text/html');
+                            const tocList = navDoc.querySelector('nav[epub\\:type="toc"] ol');
+                            if (tocList) {
+                                this.appendTocItems(tocList, this.elements.sidebar, 1);
+                            }
+                        }
+                    } else {
+                        const ncxId = this.state.currentEpubNcxId;
+                        const ncxItem = ncxId ? manifest[ncxId] : null;
+                        if (ncxItem) {
+                            const ncxFile = this.state.zip.file(decodeURIComponent(ncxItem.href));
+                            if (ncxFile) {
+                                const ncxXml = await ncxFile.async('string');
+                                const parser = new DOMParser();
+                                const ncxDoc = parser.parseFromString(ncxXml, "application/xml");
+                                this.appendNcxItems(ncxDoc.querySelector('navMap'), this.elements.sidebar, 1);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Error generating EPUB TOC:", e);
+                }
+            }
+
+            appendTocItems(listElement, parentElement, level) {
+                if (!listElement) return;
+                for (const item of listElement.children) {
+                    if (item.tagName.toLowerCase() !== 'li') continue;
+                    
+                    const link = item.querySelector('a');
+                    if (link) {
+                        const tocItem = document.createElement('div');
+                        tocItem.className = `toc-item level-${level}`;
+                        tocItem.textContent = link.textContent.trim();
+                        
+                        const href = link.getAttribute('href');
+                        const targetId = this.findIdrefFromHref(href, this.state.currentEpubManifest);
+                        if (targetId) {
+                             tocItem.onclick = () => {
+                                const targetElement = document.getElementById(`epub-section-${targetId}`);
+                                targetElement?.scrollIntoView({ behavior: 'smooth' });
+                                if (this.state.sidebarOpen) this.toggleSidebar();
+                            };
+                            parentElement.appendChild(tocItem);
+                        }
+                    }
+                    
+                    const sublist = item.querySelector('ol');
+                    if (sublist) {
+                        this.appendTocItems(sublist, parentElement, level + 1);
+                    }
+                }
+            }
+            
+            appendNcxItems(navMap, parentElement, level) {
+                if (!navMap) return;
+                for (const navPoint of navMap.children) {
+                    if (navPoint.tagName.toLowerCase() !== 'navpoint') continue;
+
+                    const label = navPoint.querySelector('navLabel text')?.textContent;
+                    const src = navPoint.querySelector('content')?.getAttribute('src');
+                    if (label && src) {
+                        const tocItem = document.createElement('div');
+                        tocItem.className = `toc-item level-${level}`;
+                        tocItem.textContent = label.trim();
+                        
+                        const targetId = this.findIdrefFromHref(src, this.state.currentEpubManifest);
+                        if (targetId) {
+                            tocItem.onclick = () => {
+                                document.getElementById(`epub-section-${targetId}`)?.scrollIntoView({ behavior: 'smooth' });
+                                if (this.state.sidebarOpen) this.toggleSidebar();
+                            };
+                            parentElement.appendChild(tocItem);
+                        }
+                    }
+                    this.appendNcxItems(navPoint, parentElement, level + 1);
+                }
+            }
+
+            findIdrefFromHref(tocHref, manifest) {
+                if (!tocHref || !manifest) return null;
+                const cleanTocHref = tocHref.split('#')[0];
+                
+                for (const id in manifest) {
+                    const manifestItem = manifest[id];
+                    if (decodeURIComponent(manifestItem.href).endsWith(cleanTocHref)) {
+                        return manifestItem.id;
+                    }
+                }
+                return null;
             }
 
             setupContentObservers() {
@@ -1679,12 +2019,35 @@
             }
 
             saveFilesToStorage() {
-                this.saveJSON('markdownReaderFiles', Array.from(this.state.files.entries()));
+                const filesToStore = new Map();
+                for (const [filename, fileData] of this.state.files.entries()) {
+                    if (fileData.type === 'epub' && fileData.content instanceof ArrayBuffer) {
+                        const storableFileData = { ...fileData, content: this._arrayBufferToBase64(fileData.content) };
+                        filesToStore.set(filename, storableFileData);
+                    } else {
+                        filesToStore.set(filename, fileData);
+                    }
+                }
+                this.saveJSON('markdownReaderFiles', Array.from(filesToStore.entries()));
             }
 
             loadFilesFromStorage() {
                 const storedFiles = this.loadJSON('markdownReaderFiles', []);
-                this.state.files = new Map(storedFiles);
+                const loadedFiles = new Map();
+                for (const [filename, fileData] of storedFiles) {
+                    // Check for old format (no type property) and provide backward compatibility
+                    if (!fileData.type) {
+                        fileData.type = 'markdown';
+                    }
+
+                    if (fileData.type === 'epub') {
+                        const loadedFileData = { ...fileData, content: this._base64ToArrayBuffer(fileData.content) };
+                        loadedFiles.set(filename, loadedFileData);
+                    } else {
+                        loadedFiles.set(filename, fileData);
+                    }
+                }
+                this.state.files = loadedFiles;
             }
 
             updateFileSelect() {
@@ -1714,6 +2077,26 @@
             }
 
             // ===== UTILITY METHODS =====
+            _arrayBufferToBase64(buffer) {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return window.btoa(binary);
+            }
+
+            _base64ToArrayBuffer(base64) {
+                const binary_string = window.atob(base64);
+                const len = binary_string.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binary_string.charCodeAt(i);
+                }
+                return bytes.buffer;
+            }
+
             loadJSON(key, defaultValue) {
                 try {
                     const saved = localStorage.getItem(key);
