@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -301,7 +303,7 @@
         .markdown-content h2, .markdown-content h3, .markdown-content h4, .markdown-content h5, .markdown-content h6 { cursor: pointer; }
         .markdown-content h2::before, .markdown-content h3::before, .markdown-content h4::before, .markdown-content h5::before, .markdown-content h6::before { content: '▼'; font-size: 0.8em; margin-right: 0.5rem; color: var(--text-muted); transition: transform 0.2s ease; }
         .markdown-content h2.collapsed::before, .markdown-content h3.collapsed::before, .markdown-content h4.collapsed::before, .markdown-content h5.collapsed::before, .markdown-content h6.collapsed::before { transform: rotate(-90deg); }
-        .markdown-content p { margin: 1.5rem 0; text-align: justify; }
+        .markdown-content p { margin: 1.5rem 0; text-align: var(--text-align, justify); }
         .markdown-content blockquote { margin: 2rem 0; padding: 1.5rem; background: var(--bg-secondary); border-left: 4px solid var(--accent-primary); border-radius: var(--border-radius); font-style: italic; position: relative; }
         .markdown-content .quote-author { font-style: normal; font-weight: 600; margin-top: 1rem; display: block; text-align: right; color: var(--text-secondary); }
         .markdown-content ul, .markdown-content ol { margin: 1.5rem 0; padding-left: 2rem; }
@@ -574,10 +576,10 @@
         }
 
         /* ===== ANIMATIONS ===== */
-        .fade-in { animation: fadeIn 0.6s ease-out; }
+        .fade-in { /* animation disabled */ }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .section-fade-in { opacity: 0; transform: translateY(20px); transition: all 0.6s ease; }
-        .section-fade-in.visible { opacity: 1; transform: translateY(0); }
+        .section-fade-in { /* animation disabled */ }
+        .section-fade-in.visible { /* animation disabled */ }
 
         /* ===== PRINT STYLES ===== */
         @media print {
@@ -654,7 +656,7 @@
                </div>
             </div>
         </div>
-        <input type="file" id="fileInput" accept=".md,.txt" style="display: none;" multiple>
+        <input type="file" id="fileInput" accept=".md,.txt,.epub" style="display: none;" multiple>
     </header>
 
     <!-- Progress Bar -->
@@ -714,6 +716,15 @@
         <div class="control-group">
             <div class="control-label">Content Width</div>
             <input type="range" class="slider" id="contentWidthSlider" min="45" max="85" value="65" step="5">
+        </div>
+        <div class="control-group">
+            <div class="control-label">Text Align</div>
+            <select id="textAlignSelect" class="btn" style="width: 100%; margin: 0;">
+                <option value="justify">Justify (Compensation)</option>
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+            </select>
         </div>
         <div class="control-group">
             <div class="control-label">Background</div>
@@ -857,9 +868,11 @@
                     menuVisible: false,
                     lastScrollY: 0,
                     searchResults: [],
-                    currentSearchIndex: -1
+                    currentSearchIndex: -1,
+                    rendition: null,
+                    epubCfiRange: null
                 };
-                this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+                this.MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
 
                 this.elements = this.initializeElements();
                 this.init();
@@ -965,6 +978,7 @@
                 document.getElementById('contentWidthSlider').addEventListener('input', (e) => this.updateSetting('contentWidth', e.target.value));
                 document.getElementById('backgroundSelect').addEventListener('change', (e) => this.updateSetting('background', e.target.value));
                 document.getElementById('fontFamilySelect').addEventListener('change', (e) => this.updateSetting('fontFamily', e.target.value));
+                document.getElementById('textAlignSelect').addEventListener('change', (e) => this.updateSetting('textAlign', e.target.value));
                 document.getElementById('glassMorphismToggle').addEventListener('change', (e) => this.updateSetting('glassMorphism', e.target.checked));
 
                 const debouncedScroll = debounce(() => {
@@ -1030,18 +1044,29 @@
             }
 
             highlightSelection() {
-                const selection = window.getSelection();
-                if (selection && !selection.isCollapsed) {
-                    try {
-                        const range = selection.getRangeAt(0);
-                        const mark = document.createElement('mark');
-                        range.surroundContents(mark);
-                    } catch (e) {
-                        console.error("Could not highlight selection, it may span across multiple HTML elements.", e);
-                        this.showError("Highlighting failed. Please select text within a single block.");
-                    } finally {
-                        selection.removeAllRanges();
-                        this.hideSelectionPopup();
+                if (this.state.rendition && this.state.epubCfiRange) {
+                    // EPUB highlighting
+                    this.state.rendition.annotations.add("highlight", this.state.epubCfiRange, {}, (e) => {
+                        console.log("highlight added", e);
+                    }, "hl");
+                    this.state.rendition.themes.default({ ".hl": { "fill": "yellow", "fill-opacity": "0.3", "stroke": "yellow" } });
+                    this.hideSelectionPopup();
+                    this.state.epubCfiRange = null;
+                } else {
+                    // Markdown highlighting (existing logic)
+                    const selection = window.getSelection();
+                    if (selection && !selection.isCollapsed) {
+                        try {
+                            const range = selection.getRangeAt(0);
+                            const mark = document.createElement('mark');
+                            range.surroundContents(mark);
+                        } catch (e) {
+                            console.error("Could not highlight selection, it may span across multiple HTML elements.", e);
+                            this.showError("Highlighting failed. Please select text within a single block.");
+                        } finally {
+                            selection.removeAllRanges();
+                            this.hideSelectionPopup();
+                        }
                     }
                 }
             }
@@ -1093,9 +1118,17 @@
                 this.elements.recentFilesModal.classList.remove('active');
             }
 
-            showSelectionPopup(rect) {
+            showSelectionPopup(rect, cfiRange = null) {
                 const popup = this.elements.selectionPopup;
                 if (!popup) return;
+
+                this.state.epubCfiRange = cfiRange;
+
+                // Show/hide buttons based on content type
+                const isEpub = !!cfiRange;
+                this.elements.boldBtn.style.display = isEpub ? 'none' : 'inline-block';
+                this.elements.underlineBtn.style.display = isEpub ? 'none' : 'inline-block';
+
 
                 const contentWrapperRect = this.elements.contentWrapper.getBoundingClientRect();
 
@@ -1135,10 +1168,10 @@
 
             async handleDrop(event) {
                 const files = Array.from(event.dataTransfer.files).filter(file => 
-                    file.type === 'text/markdown' || file.name.endsWith('.md') || file.name.endsWith('.txt')
+                    file.type === 'text/markdown' || file.name.endsWith('.md') || file.name.endsWith('.txt') || file.name.endsWith('.epub')
                 );
                 if (files.length === 0) {
-                    this.showError('Please drop Markdown (.md) or text (.txt) files.');
+                    this.showError('Please drop Markdown (.md), text (.txt), or EPUB (.epub) files.');
                     return;
                 }
                 await this.processFiles(files);
@@ -1179,12 +1212,18 @@
                     reader.onload = (e) => {
                         this.state.files.set(file.name, {
                             name: file.name,
-                            content: e.target.result
+                            content: e.target.result,
+                            type: file.name.endsWith('.epub') ? 'epub' : 'text'
                         });
                         resolve();
                     };
                     reader.onerror = () => reject(new Error('Failed to read file: ' + file.name));
-                    reader.readAsText(file);
+
+                    if (file.name.endsWith('.epub')) {
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        reader.readAsText(file);
+                    }
                 });
             }
 
@@ -1196,7 +1235,21 @@
 
                 this.state.currentFile = filename;
                 const file = this.state.files.get(filename);
-                
+
+                // Clear content and reset some state before loading
+                this.elements.markdownContent.innerHTML = '';
+                this.elements.sidebar.innerHTML = '';
+                this.elements.readingStats.classList.remove('visible');
+                this.elements.progressBar.classList.remove('visible');
+
+                if (file.type === 'epub') {
+                    await this.loadEpub(file);
+                } else {
+                    await this.loadMarkdown(file);
+                }
+            }
+
+            async loadMarkdown(file) {
                 try {
                     const contentToParse = String(file.content || '');
                     const html = await marked.parse(contentToParse);
@@ -1215,12 +1268,104 @@
                     
                     this.elements.readingStats.classList.add('visible');
                     this.elements.progressBar.classList.add('visible');
-                    this.elements.fileSelectInMenu.value = filename;
+                    this.elements.fileSelectInMenu.value = file.name;
 
                 } catch (error) {
                     console.error("Markdown Parsing Error:", error);
                     this.showError('Failed to render markdown. The file might be corrupted or contain unsupported syntax.');
                 }
+            }
+
+            async loadEpub(file) {
+                try {
+                    this.elements.markdownContent.style.padding = '0'; // epubjs handles its own padding
+                    const book = ePub(file.content);
+                    this.state.rendition = book.renderTo(this.elements.markdownContent, {
+                        width: "100%",
+                        height: "calc(100vh - var(--header-height))", // Fill available space
+                        flow: "scrolled-continuous", // Makes it scrollable
+                        spread: "none"
+                    });
+                    
+                    await this.state.rendition.display();
+                    
+                    // Generate TOC for EPUB
+                    const toc = await book.loaded.navigation;
+                    this.generateEpubToc(toc.toc);
+
+                    // Hook into epub.js events to update our UI
+                    this.state.rendition.on("relocated", (location) => {
+                        // Update progress bar
+                        const progress = book.locations.percentageFromCfi(location.start.cfi) * 100;
+                        this.elements.progressBar.style.width = `${Math.min(progress, 100)}%`;
+                        document.getElementById('readingProgress').textContent = `${Math.round(progress)}%`;
+                        
+                        // Update current section in TOC
+                        const currentNav = book.navigation.get(location.start.href);
+                        if (currentNav && currentNav.href) {
+                            this.elements.sidebar.querySelectorAll('.toc-item').forEach(item => {
+                                item.classList.toggle('active', item.dataset.href === currentNav.href);
+                            });
+                        }
+                    });
+
+                    // Generate locations for progress calculation
+                    await book.locations.generate(1024); // 1024 characters per "page"
+
+                    this.state.rendition.on("renderer:selected", (cfiRange, contents) => {
+                        const selection = contents.window.getSelection();
+                        if (selection && !selection.isCollapsed) {
+                            const range = selection.getRangeAt(0);
+                            const rect = range.getBoundingClientRect();
+                            const viewportRect = this.elements.markdownContent.getBoundingClientRect();
+                            const adjustedRect = {
+                                top: rect.top + viewportRect.top,
+                                left: rect.left + viewportRect.left,
+                                bottom: rect.bottom + viewportRect.top,
+                                right: rect.right + viewportRect.left,
+                                width: rect.width,
+                                height: rect.height
+                            };
+                            this.showSelectionPopup(adjustedRect, cfiRange);
+                        }
+                    });
+
+                    this.elements.readingStats.classList.add('visible');
+                    this.elements.progressBar.classList.add('visible');
+                    this.elements.fileSelectInMenu.value = file.name;
+
+                } catch (error) {
+                    console.error("EPUB Loading Error:", error);
+                    this.showError('Failed to load EPUB file. It might be corrupted or in an unsupported format.');
+                }
+            }
+            
+            generateEpubToc(toc) {
+                this.elements.sidebar.innerHTML = '';
+                const tocTitle = document.createElement('div');
+                tocTitle.className = 'toc-title';
+                tocTitle.textContent = 'Table of Contents';
+                this.elements.sidebar.appendChild(tocTitle);
+
+                const createTocItem = (item, level) => {
+                    const tocItem = document.createElement('div');
+                    tocItem.className = `toc-item level-${level}`;
+                    tocItem.textContent = item.label.trim();
+                    tocItem.dataset.href = item.href;
+                    tocItem.onclick = () => {
+                        if (this.state.rendition) {
+                            this.state.rendition.display(item.href);
+                            if (this.state.sidebarOpen) this.toggleSidebar();
+                        }
+                    };
+                    this.elements.sidebar.appendChild(tocItem);
+
+                    if (item.subitems && item.subitems.length > 0) {
+                        item.subitems.forEach(subitem => createTocItem(subitem, level + 1));
+                    }
+                };
+
+                toc.forEach(item => createTocItem(item, 1));
             }
 
             wrapTables() {
@@ -1616,7 +1761,7 @@
             loadSettings() {
                 return this.loadJSON('markdownReaderSettingsV2', {
                     theme: 'dark', fontSize: 18, lineHeight: 1.8, contentWidth: 65,
-                    background: '1', fontFamily: 'serif', glassMorphism: false
+                    background: '1', fontFamily: 'serif', glassMorphism: false, textAlign: 'justify'
                 });
             }
 
@@ -1646,7 +1791,8 @@
                         };
                         rootStyle.setProperty('--reading-font-family', fontMap[value]);
                     },
-                    'glassMorphism': () => document.body.classList.toggle('glass-morphism-active', value)
+            'glassMorphism': () => document.body.classList.toggle('glass-morphism-active', value),
+            'textAlign': () => rootStyle.setProperty('--text-align', value)
                 };
                 if (settingMap[key]) settingMap[key]();
             }
