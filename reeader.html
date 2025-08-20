@@ -6,7 +6,12 @@
     <title>Premium Markdown Reader</title>
     
     <!-- CDN Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -210,7 +215,6 @@
             z-index: 1200; /* Above overlay */
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: var(--shadow-heavy);
-            will-change: transform;
         }
 
         .side-panel.left {
@@ -269,7 +273,6 @@
             border-right: 1px solid var(--border-color); padding: 1.5rem; overflow-y: auto;
             transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1200;
-            will-change: transform;
         }
         .sidebar.open { transform: translateX(0); }
         .toc-title { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
@@ -890,62 +893,8 @@
                 };
                 this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
-                try {
-                    this.parserWorker = new Worker('parser-worker.js');
-                    this.parserWorker.onmessage = this.handleWorkerMessage.bind(this);
-                } catch (e) {
-                    console.error("Failed to create worker:", e);
-                    this.showError("Could not initialize background parser. The application may not work correctly.");
-                }
-
                 this.elements = this.initializeElements();
                 this.init();
-            }
-
-            handleWorkerMessage(event) {
-                const { type, payload, message } = event.data;
-                this.hideLoading();
-
-                if (type === 'success') {
-                    if (payload.type === 'epub') {
-                        this.renderEpubContent(payload);
-                    } else {
-                        this.renderMarkdownContent(payload.html);
-                    }
-                } else {
-                    this.showError(message || 'An unknown error occurred during parsing.');
-                }
-            }
-
-            postRenderSetup() {
-                this.wrapTables();
-                this.generateSidebarContent();
-                this.updateReadingStats();
-                this.setupContentObservers();
-                this.loadReadingPosition();
-                this.elements.readingStats.classList.add('visible');
-                this.elements.progressBar.classList.add('visible');
-            }
-
-            renderEpubContent(payload) {
-                this.elements.markdownContent.innerHTML = '<div id="epub-content">' + payload.html + '</div>';
-
-                const existingStyle = document.getElementById('epub-styles');
-                if (existingStyle) existingStyle.remove();
-                const styleElement = document.createElement('style');
-                styleElement.id = 'epub-styles';
-                styleElement.textContent = payload.css;
-                document.head.appendChild(styleElement);
-                
-                this.postRenderSetup();
-            }
-
-            renderMarkdownContent(html) {
-                this.elements.markdownContent.innerHTML = html;
-                this.elements.markdownContent.classList.remove('fade-in');
-                void this.elements.markdownContent.offsetWidth; // Trigger reflow
-                this.elements.markdownContent.classList.add('fade-in');
-                this.postRenderSetup();
             }
 
             // ===== INITIALIZATION =====
@@ -974,6 +923,46 @@
                 this.applySettings();
                 this.loadFilesFromStorage();
                 this.updateFileSelect();
+                this.setupCustomRenderer();
+            }
+
+            setupCustomRenderer() {
+                const renderer = new marked.Renderer();
+                const originalHeading = renderer.heading.bind(renderer);
+
+                renderer.code = (code, lang) => {
+                    const codeToHighlight = String(code || '');
+                    const language = lang || 'text';
+                    const highlighted = hljs.getLanguage(lang) 
+                        ? hljs.highlight(codeToHighlight, { language, ignoreIllegals: true }).value
+                        : hljs.highlightAuto(codeToHighlight).value;
+
+                    return `<pre><div class="code-header"><span>${language}</span><button class="copy-btn" onclick="copyCode(this)" title="Copy code">📋 Copy</button></div><code class="hljs ${language}">${highlighted}</code></pre>`;
+                };
+
+                renderer.image = (href, title, text) => {
+                    return `<img src="${href}" alt="${text}" title="${title || ''}" onclick="app.openLightbox('${href}', '${text}')" loading="lazy">`;
+                };
+                
+                renderer.blockquote = (quote) => {
+                    const authorMatch = quote.match(/<p>—(.*?)<\/p>\s*$/);
+                    if (authorMatch) {
+                        const content = quote.replace(authorMatch[0], '');
+                        const author = authorMatch[1].trim();
+                        return `<blockquote>${content}<p class="quote-author">— ${author}</p></blockquote>`;
+                    }
+                    return `<blockquote>${quote}</blockquote>`;
+                };
+
+                renderer.heading = (text, level, raw) => {
+                    const anchor = String(raw || '').toLowerCase().replace(/[^\w\u4e00-\u9fa5]+/g, '-');
+                    const bookmarkIcon = `<span class="bookmark-icon" onclick="app.toggleBookmark('${anchor}', event)" title="Bookmark section">☆</span>`;
+                    // Use the original renderer to get the basic h-tag, then inject our icon.
+                    const headingHtml = originalHeading(text, level, raw, marked);
+                    return headingHtml.replace(`id="${anchor}"`, `id="${anchor}">${bookmarkIcon}`);
+                };
+
+                marked.setOptions({ renderer, breaks: true, gfm: true });
             }
 
             // ===== EVENT LISTENERS =====
@@ -1174,7 +1163,6 @@
 
             // ===== FILE HANDLING =====
             async handleFileSelect(event) {
-                console.log("handleFileSelect triggered");
                 await this.processFiles(Array.from(event.target.files));
             }
 
@@ -1190,7 +1178,6 @@
             }
             
             async processFiles(files) {
-                console.log("processFiles started");
                 if (files.length === 0) return;
                 
                 const validFiles = files.filter(file => {
@@ -1215,7 +1202,7 @@
                 } catch (error) {
                     this.showError('Failed to process files: ' + error.message);
                 } finally {
-                    // Note: hideLoading() is now called by the worker message handler
+                    this.hideLoading();
                 }
             }
 
@@ -1242,14 +1229,8 @@
             }
 
             async loadFile(filename) {
-                console.log("loadFile started for:", filename);
-                if (!this.parserWorker) {
-                    this.showError("The background parser is not available. Cannot load file.");
-                    return;
-                }
                 if (!filename || !this.state.files.has(filename)) return;
 
-                console.log("Removing initial-view class");
                 document.body.classList.remove('initial-view');
                 this.elements.searchContainer.style.display = 'flex';
 
@@ -1258,8 +1239,236 @@
                 
                 this.elements.fileSelectInMenu.value = filename;
 
+                if (file.type === 'epub') {
+                    await this.loadEpub(file);
+                } else {
+                    await this.loadMarkdown(file);
+                }
+            }
+
+            async loadMarkdown(file) {
+                try {
+                    const contentToParse = String(file.content || '');
+                    const html = await marked.parse(contentToParse);
+                    
+                    this.elements.markdownContent.innerHTML = html;
+                    this.elements.markdownContent.classList.remove('fade-in');
+                    void this.elements.markdownContent.offsetWidth; // Trigger reflow
+                    this.elements.markdownContent.classList.add('fade-in');
+                    
+                    this.wrapTables();
+                    this.generateSidebarContent();
+                    this.updateReadingStats();
+                    this.setupContentObservers();
+                    
+                    this.loadReadingPosition();
+                    
+                    this.elements.readingStats.classList.add('visible');
+                    this.elements.progressBar.classList.add('visible');
+
+                } catch (error) {
+                    console.error("Markdown Parsing Error:", error);
+                    this.showError('Failed to render markdown. The file might be corrupted or contain unsupported syntax.');
+                }
+            }
+
+            async loadEpub(file) {
                 this.showLoading();
-                this.parserWorker.postMessage({ file });
+                console.log("Loading EPUB file:", file.name);
+                try {
+                    this.elements.markdownContent.innerHTML = `<div id="epub-content"></div>`;
+
+                    const zip = await JSZip.loadAsync(file.content);
+
+                    const containerXmlFile = zip.file("META-INF/container.xml");
+                    if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
+                    const containerXml = await containerXmlFile.async("string");
+                    const parser = new DOMParser();
+                    const containerDoc = parser.parseFromString(containerXml, "application/xml");
+                    const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
+                    if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
+                    
+                    const basePath = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : "";
+
+                    const opfFile = zip.file(opfPath);
+                    if (!opfFile) throw new Error(`.opf file not found at path: ${opfPath}`);
+                    const opfXml = await opfFile.async("string");
+                    const opfDoc = parser.parseFromString(opfXml, "application/xml");
+
+                    const manifest = {};
+                    const manifestItems = opfDoc.getElementsByTagName("item");
+                    for (const item of manifestItems) {
+                        const href = item.getAttribute("href");
+                        if (href) {
+                            manifest[item.getAttribute("id")] = {
+                                href: basePath + href,
+                                mediaType: item.getAttribute("media-type"),
+                                id: item.getAttribute("id")
+                            };
+                        }
+                    }
+
+                    const spine = [];
+                    const spineItems = opfDoc.getElementsByTagName("itemref");
+                    for (const item of spineItems) {
+                        spine.push(item.getAttribute("idref"));
+                    }
+                    
+                    // Store manifest and other data for TOC generation
+                    this.state.currentEpubManifest = manifest;
+                    this.state.zip = zip;
+                    const spineEl = opfDoc.getElementsByTagName("spine")[0];
+                    this.state.currentEpubNcxId = spineEl?.getAttribute("toc");
+
+                    // Process content
+                    const content = await this.aggregateEpubContent(zip, manifest, spine);
+                    
+                    const epubContentDiv = this.elements.markdownContent.querySelector('#epub-content');
+                    epubContentDiv.innerHTML = content.html;
+
+                    const existingStyle = document.getElementById('epub-styles');
+                    if (existingStyle) existingStyle.remove();
+                    const styleElement = document.createElement('style');
+                    styleElement.id = 'epub-styles';
+                    styleElement.textContent = content.css;
+                    document.head.appendChild(styleElement);
+                    
+                    this.generateSidebarContent(); // Now this needs to handle EPUBs
+                    this.updateReadingStats();
+                    this.setupContentObservers();
+                    this.loadReadingPosition();
+                    this.elements.readingStats.classList.add('visible');
+                    this.elements.progressBar.classList.add('visible');
+
+                } catch (error) {
+                    console.error("EPUB Loading Error:", error);
+                    this.showError(`Failed to load EPUB: ${error.message}`);
+                } finally {
+                    this.hideLoading();
+                }
+            }
+
+            async aggregateEpubContent(zip, manifest, spine) {
+                let aggregatedHtml = '';
+                let aggregatedCss = '';
+                const parser = new DOMParser();
+
+                for (const id in manifest) {
+                    const item = manifest[id];
+                    if (item.mediaType === 'text/css') {
+                        const cssFile = zip.file(decodeURIComponent(item.href));
+                        if (cssFile) {
+                            const rawCss = await cssFile.async('string');
+                            aggregatedCss += this.scopeCss(rawCss, '#epub-content') + '\n';
+                        }
+                    }
+                }
+
+                for (const idref of spine) {
+                    const manifestItem = manifest[idref];
+                    if (!manifestItem || !manifestItem.href) continue;
+
+                    const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
+                    if (!htmlFile) continue;
+                    
+                    const rawHtml = await htmlFile.async('string');
+                    const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
+
+                    htmlDoc.querySelectorAll('script').forEach(s => s.remove());
+                    htmlDoc.querySelectorAll('link[rel="stylesheet"]').forEach(l => l.remove());
+                    
+                    const assetTags = htmlDoc.querySelectorAll('img[src], image[href]');
+                    for (const tag of assetTags) {
+                        const attr = tag.hasAttribute('src') ? 'src' : 'href';
+                        const relativePath = tag.getAttribute(attr);
+                        if (!relativePath) continue;
+
+                        try {
+                            const absolutePath = this.resolveEpubPath(manifestItem.href, relativePath);
+                            const assetFile = zip.file(decodeURIComponent(absolutePath));
+                            if (assetFile) {
+                                const mimeType = this.getMimeTypeFromPath(absolutePath);
+                                const blob = await assetFile.async('blob');
+                                const blobUrl = URL.createObjectURL(blob.slice(0, blob.size, mimeType));
+                                tag.setAttribute(attr, blobUrl);
+                            }
+                        } catch (e) {
+                            console.warn(`Could not process asset ${relativePath}: ${e}`);
+                        }
+                    }
+                    
+                    if (htmlDoc.body) {
+                        // Add an ID to the first element of each spine item for TOC navigation
+                        const firstElement = htmlDoc.body.firstElementChild;
+                        if (firstElement) {
+                            firstElement.id = `epub-section-${idref}`;
+                        }
+                        aggregatedHtml += htmlDoc.body.innerHTML;
+                    }
+                }
+
+                return { html: aggregatedHtml, css: aggregatedCss };
+            }
+            
+            getMimeTypeFromPath(path) {
+                const extension = path.split('.').pop().toLowerCase();
+                const mimeTypes = {
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'png': 'image/png',
+                    'gif': 'image/gif',
+                    'svg': 'image/svg+xml',
+                    'webp': 'image/webp'
+                };
+                return mimeTypes[extension] || 'application/octet-stream';
+            }
+
+            resolveEpubPath(htmlFilePath, relativeAssetPath) {
+                const pathParts = htmlFilePath.split('/');
+                pathParts.pop(); // remove filename
+
+                const assetParts = relativeAssetPath.split('/');
+                for (const part of assetParts) {
+                    if (part === '..') {
+                        if (pathParts.length > 0) pathParts.pop();
+                    } else if (part !== '.' && part !== '') {
+                        pathParts.push(part);
+                    }
+                }
+                return pathParts.join('/');
+            }
+
+            scopeCss(css, scope) {
+                // This is a simplified implementation but should handle many cases.
+                // It avoids trying to scope @-rules like @font-face or @keyframes.
+                // It works by splitting the CSS by `{` and `}`.
+                let scopedCss = '';
+                const parts = css.split(/([{}])/);
+                let depth = 0;
+                let selectors = [];
+
+                for (let i = 0; i < parts.length; i++) {
+                    const part = parts[i];
+                    if (part === '{') {
+                        if (depth === 0) {
+                            const selectorGroup = parts[i - 1];
+                            if (!selectorGroup.trim().startsWith('@')) {
+                                selectors = selectorGroup.split(',').map(s => {
+                                    const trimmed = s.trim();
+                                    if (trimmed.toLowerCase() === 'body' || trimmed.toLowerCase() === 'html') {
+                                        return scope;
+                                    }
+                                    return `${scope} ${trimmed}`;
+                                });
+                                parts[i - 1] = selectors.join(', ');
+                            }
+                        }
+                        depth++;
+                    } else if (part === '}') {
+                        depth--;
+                    }
+                }
+                return parts.join('');
             }
 
             wrapTables() {
