@@ -5,7 +5,8 @@ try {
     importScripts(
         'https://cdn.jsdelivr.net/npm/marked/marked.min.js',
         'https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js',
-        'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
+        'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+        'https://cdn.jsdelivr.net/npm/xmldom@0.6.0/dom-parser.js' // +++ ADD THIS LINE
     );
 } catch (e) {
     console.error('Worker script import failed:', e);
@@ -16,7 +17,7 @@ try {
 self.onmessage = async (event) => {
     const { file } = event.data;
 
-    if (!self.marked || !self.hljs || !self.JSZip) {
+    if (!self.marked || !self.hljs || !self.JSZip || !self.DOMParser) {
          postMessage({ type: 'error', message: 'Parsing libraries not available in worker.' });
          return;
     }
@@ -136,7 +137,7 @@ function scopeCss(css, scope) {
 async function aggregateEpubContent(zip, manifest, spine) {
     let aggregatedHtml = '';
     let aggregatedCss = '';
-    const parser = new self.DOMParser(); // FIXED
+    const parser = new self.DOMParser(); // This will now use the imported library
 
     for (const id in manifest) {
         const item = manifest[id];
@@ -194,7 +195,7 @@ async function parseEpub(file) {
     const containerXmlFile = zip.file("META-INF/container.xml");
     if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
     const containerXml = await containerXmlFile.async("string");
-    const parser = new self.DOMParser(); // FIXED
+    const parser = new self.DOMParser(); // This will now use the imported library
     const containerDoc = parser.parseFromString(containerXml, "application/xml");
     const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
     if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
