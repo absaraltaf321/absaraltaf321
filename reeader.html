@@ -888,7 +888,7 @@
                     searchResults: [],
                     currentSearchIndex: -1
                 };
-                this.MAX_FILE_SIZE = 30 * 1024 * 1024; // 5 MB
+                this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
                 try {
                     this.parserWorker = new Worker('parser-worker.js');
