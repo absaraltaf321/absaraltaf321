@@ -136,7 +136,7 @@ function scopeCss(css, scope) {
 async function aggregateEpubContent(zip, manifest, spine) {
     let aggregatedHtml = '';
     let aggregatedCss = '';
-    const parser = new self.DOMParser();
+    const parser = new DOMParser();
 
     for (const id in manifest) {
         const item = manifest[id];
@@ -154,12 +154,12 @@ async function aggregateEpubContent(zip, manifest, spine) {
         if (!manifestItem || !manifestItem.href) continue;
         const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
         if (!htmlFile) continue;
-
+        
         const rawHtml = await htmlFile.async('string');
         const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
 
         htmlDoc.querySelectorAll('script, link[rel="stylesheet"]').forEach(el => el.remove());
-
+        
         const assetTags = htmlDoc.querySelectorAll('img[src], image[href]');
         for (const tag of assetTags) {
             const attr = tag.hasAttribute('src') ? 'src' : 'href';
@@ -179,7 +179,7 @@ async function aggregateEpubContent(zip, manifest, spine) {
                 console.warn('Could not process asset ' + relativePath + ': ' + e);
             }
         }
-
+        
         if (htmlDoc.body) {
             aggregatedHtml += htmlDoc.body.innerHTML;
         }
@@ -194,11 +194,11 @@ async function parseEpub(file) {
     const containerXmlFile = zip.file("META-INF/container.xml");
     if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
     const containerXml = await containerXmlFile.async("string");
-    const parser = new self.DOMParser();
+    const parser = new DOMParser();
     const containerDoc = parser.parseFromString(containerXml, "application/xml");
     const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
     if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
-
+    
     const basePath = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : "";
 
     const opfFile = zip.file(opfPath);
@@ -226,6 +226,6 @@ async function parseEpub(file) {
     }
 
     const content = await aggregateEpubContent(zip, manifest, spine);
-
+    
     return { ...content, type: 'epub' };
 }
