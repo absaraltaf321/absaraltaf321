@@ -136,7 +136,7 @@ function scopeCss(css, scope) {
 async function aggregateEpubContent(zip, manifest, spine) {
     let aggregatedHtml = '';
     let aggregatedCss = '';
-    const parser = new DOMParser();
+    const parser = new self.DOMParser(); // FIXED
 
     for (const id in manifest) {
         const item = manifest[id];
@@ -194,7 +194,7 @@ async function parseEpub(file) {
     const containerXmlFile = zip.file("META-INF/container.xml");
     if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
     const containerXml = await containerXmlFile.async("string");
-    const parser = new DOMParser();
+    const parser = new self.DOMParser(); // FIXED
     const containerDoc = parser.parseFromString(containerXml, "application/xml");
     const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
     if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
