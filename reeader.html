@@ -200,27 +200,38 @@
         }
         .menu-toggle-btn:hover { background: var(--bg-secondary); }
 
-        .dropdown-menu {
-            position: absolute;
-            top: calc(100% + 10px);
+        /* ===== SIDE PANELS (MENU & SETTINGS) ===== */
+        .side-panel {
+            position: fixed;
+            top: 0;
+            height: 100vh;
+            width: var(--sidebar-width);
+            background: var(--bg-accent);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 1.5rem;
+            overflow-y: auto;
+            z-index: 1200; /* Above overlay */
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .side-panel.left {
+            left: 0;
+            transform: translateX(-100%);
+            border-right: 1px solid var(--border-color);
+        }
+
+        .side-panel.right {
             right: 0;
-            background: var(--bg-primary);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-medium);
-            border: 1px solid var(--border-color);
-            width: 250px;
-            z-index: 1100;
-            opacity: 0;
-            transform: translateY(10px);
-            pointer-events: none;
-            transition: all 0.2s ease-out;
-            overflow: hidden;
+            transform: translateX(100%);
+            border-left: 1px solid var(--border-color);
         }
-        .dropdown-menu.visible {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: all;
+
+        .side-panel.open {
+            transform: translateX(0);
         }
+
         .dropdown-menu-group { padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); }
         .dropdown-menu-group:last-child { border-bottom: none; }
         .dropdown-menu-item {
@@ -260,7 +271,7 @@
             backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
             border-right: 1px solid var(--border-color); padding: 1.5rem; overflow-y: auto;
             transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            z-index: 900;
+            z-index: 1200;
         }
         .sidebar.open { transform: translateX(0); }
         .toc-title { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
@@ -273,7 +284,6 @@
 
         /* ===== MAIN CONTENT ===== */
         .main { margin-left: 0; padding-top: var(--header-height); transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); min-height: 100vh; }
-        .main.sidebar-open { margin-left: var(--sidebar-width); }
         .content-wrapper { max-width: var(--content-width); margin: 0 auto; padding: 3rem 2rem; position: relative; transition: all 0.3s ease; }
         .content-wrapper.reading-mode { max-width: var(--reading-width); }
         .content-wrapper.zen-mode { max-width: var(--reading-width); padding: 6rem 2rem; }
@@ -346,8 +356,6 @@
         .reading-stats-item { display: flex; justify-content: space-between; gap: 1rem; margin: 0.25rem 0; }
 
         /* ===== CONTROLS PANEL ===== */
-        .controls-panel { position: fixed; top: 50%; right: 2rem; transform: translateY(-50%); background: var(--bg-accent); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: var(--border-radius-lg); padding: 1rem; box-shadow: var(--shadow-medium); display: flex; flex-direction: column; gap: 0.5rem; opacity: 0; transform: translateY(-50%) translateX(100px); transition: all 0.3s ease; z-index: 800; }
-        .controls-panel.visible { opacity: 1; transform: translateY(-50%) translateX(0); }
         .control-group { padding: 0.5rem 0; border-bottom: 1px solid var(--border-color); }
         .control-group:last-child { border-bottom: none; }
         .control-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block; }
@@ -365,6 +373,23 @@
         .modal.active { opacity: 1; pointer-events: all; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         .modal-content { background: var(--bg-primary); border-radius: var(--border-radius-lg); padding: 2rem; max-width: 600px; width: 90%; box-shadow: var(--shadow-heavy); transform: scale(0.95); transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); }
         .modal.active .modal-content { transform: scale(1); }
+
+        .page-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 1150; /* Below sliders, above header */
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .page-overlay.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
 
         .modal-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem; }
         .modal-close-btn { background: none; border: none; font-size: 2rem; line-height: 1; cursor: pointer; color: var(--text-secondary); transition: color 0.2s; }
@@ -610,53 +635,12 @@
         </div>
         <div class="menu-container">
             <button class="menu-toggle-btn" id="menuToggleBtn" title="Menu">☰</button>
-            <div class="dropdown-menu" id="dropdownMenu">
-                <div class="dropdown-menu-group">
-                    <div class="dropdown-menu-item" id="uploadBtn">
-                        <span class="icon">📁</span>
-                        <span>Upload File</span>
-                    </div>
-                    <div class="dropdown-menu-item" id="recentFilesItem">
-                         <span class="icon">📄</span>
-                         <select id="fileSelectInMenu" title="Select from recent files">
-                             <option value="">Recent files...</option>
-                         </select>
-                    </div>
-                </div>
-                <div class="dropdown-menu-group">
-                    <div class="dropdown-menu-item" id="toggleSidebar">
-                        <span class="icon">📋</span>
-                        <span>Table of Contents (T)</span>
-                    </div>
-                    <div class="dropdown-menu-item" id="toggleFocus">
-                        <span class="icon">🎯</span>
-                        <span>Focus Mode (F)</span>
-                    </div>
-                    <div class="dropdown-menu-item" id="toggleZen">
-                        <span class="icon">🧘</span>
-                        <span>Zen Mode (Z)</span>
-                    </div>
-                </div>
-                <div class="dropdown-menu-group">
-                     <div class="dropdown-menu-item" id="toggleTheme">
-                        <span class="icon">🌙</span>
-                        <span>Toggle Theme</span>
-                    </div>
-                    <div class="dropdown-menu-item" id="toggleControls">
-                        <span class="icon">⚙️</span>
-                        <span>Display Settings</span>
-                    </div>
-                </div>
-                <div class="dropdown-menu-group">
-                    <div class="dropdown-menu-item" id="clearRecentsBtn" style="color: var(--error);">
-                       <span class="icon">🗑️</span>
-                       <span>Clear Recent Files</span>
-                   </div>
-               </div>
-            </div>
         </div>
         <input type="file" id="fileInput" accept=".md,.txt,.epub,text/markdown,text/plain,application/epub+zip" style="display: none;" multiple>
     </header>
+
+    <!-- Page Overlay -->
+    <div class="page-overlay" id="pageOverlay"></div>
 
     <!-- Progress Bar -->
     <div class="progress-bar" id="progressBar"></div>
@@ -703,7 +687,7 @@
     </div>
 
     <!-- Controls Panel -->
-    <div class="controls-panel" id="controlsPanel">
+    <div class="side-panel left" id="settingsSlider">
         <div class="control-group">
             <div class="control-label">Font Size</div>
             <input type="range" class="slider" id="fontSizeSlider" min="14" max="24" value="18" step="1">
@@ -801,6 +785,52 @@
         <button id="boldBtn" class="btn">Bold</button>
         <button id="underlineBtn" class="btn">Underline</button>
     </div>
+
+    <!-- Menu Slider -->
+    <div class="side-panel right" id="menuSlider">
+        <div class="dropdown-menu-group">
+            <div class="dropdown-menu-item" id="uploadBtn">
+                <span class="icon">📁</span>
+                <span>Upload File</span>
+            </div>
+            <div class="dropdown-menu-item" id="recentFilesItem">
+                 <span class="icon">📄</span>
+                 <select id="fileSelectInMenu" title="Select from recent files">
+                     <option value="">Recent files...</option>
+                 </select>
+            </div>
+        </div>
+        <div class="dropdown-menu-group">
+            <div class="dropdown-menu-item" id="toggleSidebar">
+                <span class="icon">📋</span>
+                <span>Table of Contents (T)</span>
+            </div>
+            <div class="dropdown-menu-item" id="toggleFocus">
+                <span class="icon">🎯</span>
+                <span>Focus Mode (F)</span>
+            </div>
+            <div class="dropdown-menu-item" id="toggleZen">
+                <span class="icon">🧘</span>
+                <span>Zen Mode (Z)</span>
+            </div>
+        </div>
+        <div class="dropdown-menu-group">
+             <div class="dropdown-menu-item" id="toggleTheme">
+                <span class="icon">🌙</span>
+                <span>Toggle Theme</span>
+            </div>
+            <div class="dropdown-menu-item" id="toggleControls">
+                <span class="icon">⚙️</span>
+                <span>Display Settings</span>
+            </div>
+        </div>
+        <div class="dropdown-menu-group">
+            <div class="dropdown-menu-item" id="clearRecentsBtn" style="color: var(--error);">
+               <span class="icon">🗑️</span>
+               <span>Clear Recent Files</span>
+           </div>
+       </div>
+    </div>
     
     <script>
         // ===== DEBOUNCE UTILITY =====
@@ -869,15 +899,16 @@
             // ===== INITIALIZATION =====
             initializeElements() {
                 const ids = [
-                    'fileInput', 'markdownContent', 'progressBar', 'sidebar', 'main', 
+                    'fileInput', 'markdownContent', 'progressBar', 'sidebar', 'main',
                     'contentWrapper', 'floatingSection', 'readingStats',
-                    'controlsPanel', 'lightbox', 'dropZone', 'zenScrollIndicator',
-                    'zenScrollThumb', 'menuToggleBtn', 'dropdownMenu', 'uploadBtn',
+                    'settingsSlider', 'lightbox', 'dropZone', 'zenScrollIndicator',
+                    'zenScrollThumb', 'menuToggleBtn', 'menuSlider', 'uploadBtn',
                     'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'recentFilesBox', 'appModal',
-                    'modalTitle', 'modalBody', 'searchInput', 'searchContainer', 'searchControls', 
+                    'modalTitle', 'modalBody', 'searchInput', 'searchContainer', 'searchControls',
                     'searchCounter', 'searchPrevBtn', 'searchNextBtn', 'clearRecentsBtn',
                     'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn',
-                    'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage'
+                    'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage',
+                    'pageOverlay'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -959,6 +990,11 @@
                 document.getElementById('toggleZen').addEventListener('click', () => this.toggleZenMode());
                 document.getElementById('toggleControls').addEventListener('click', () => this.toggleControls());
                 this.elements.clearRecentsBtn.addEventListener('click', () => this.clearRecentFiles());
+                this.elements.pageOverlay.addEventListener('click', () => {
+                    this.hideMenu();
+                    this.hideControls();
+                    this.hideSidebar();
+                });
                 
                 // Controls Panel
                 document.getElementById('fontSizeSlider').addEventListener('input', (e) => this.updateSetting('fontSize', e.target.value));
@@ -998,13 +1034,8 @@
                 document.addEventListener('drop', (e) => this.handleDrop(e));
 
                 document.addEventListener('click', (e) => {
-                    if (!this.elements.controlsPanel.contains(e.target) && !e.target.closest('#toggleControls')) {
-                        this.hideControls();
-                    }
-                    if (!this.elements.menuToggleBtn.contains(e.target) && !this.elements.dropdownMenu.contains(e.target)) {
-                        this.hideMenu();
-                    }
-                    if (this.elements.selectionPopup && !this.elements.selectionPopup.contains(e.target)) {
+                    // This listener now only needs to worry about things that DON'T have a full-page overlay
+                    if (this.elements.selectionPopup && !this.elements.selectionPopup.contains(e.target) && !window.getSelection().toString()) {
                         this.hideSelectionPopup();
                     }
                 });
@@ -1668,14 +1699,27 @@
             }
 
             // ===== UI CONTROLS & MODES =====
+            toggleOverlay(force) {
+                this.elements.pageOverlay.classList.toggle('visible', force);
+            }
+
             toggleMenu() {
                 this.state.menuVisible = !this.state.menuVisible;
-                this.elements.dropdownMenu.classList.toggle('visible', this.state.menuVisible);
+                if (this.state.menuVisible) { // When opening, hide others
+                    this.hideControls();
+                    this.hideSidebar();
+                }
+                this.elements.menuSlider.classList.toggle('open', this.state.menuVisible);
+                this.toggleOverlay(this.state.menuVisible);
             }
+
             hideMenu() {
                 if (this.state.menuVisible) {
                     this.state.menuVisible = false;
-                    this.elements.dropdownMenu.classList.remove('visible');
+                    this.elements.menuSlider.classList.remove('open');
+                    if (!this.state.controlsVisible) {
+                        this.toggleOverlay(false);
+                    }
                 }
             }
 
@@ -1687,9 +1731,12 @@
 
             toggleSidebar() {
                 this.state.sidebarOpen = !this.state.sidebarOpen;
+                if (this.state.sidebarOpen) { // When opening, hide others
+                    this.hideMenu();
+                    this.hideControls();
+                }
                 this.elements.sidebar.classList.toggle('open', this.state.sidebarOpen);
-                this.elements.main.classList.toggle('sidebar-open', this.state.sidebarOpen);
-                this.hideMenu();
+                this.toggleOverlay(this.state.sidebarOpen);
             }
 
             toggleFocusMode() {
@@ -1712,13 +1759,32 @@
 
             toggleControls() {
                 this.state.controlsVisible = !this.state.controlsVisible;
-                this.elements.controlsPanel.classList.toggle('visible', this.state.controlsVisible);
-                this.hideMenu();
+                if (this.state.controlsVisible) { // When opening, hide others
+                    this.hideMenu();
+                    this.hideSidebar();
+                }
+                this.elements.settingsSlider.classList.toggle('open', this.state.controlsVisible);
+                this.toggleOverlay(this.state.controlsVisible);
             }
             
             hideControls() {
-                this.state.controlsVisible = false;
-                this.elements.controlsPanel.classList.remove('visible');
+                if (this.state.controlsVisible) {
+                    this.state.controlsVisible = false;
+                    this.elements.settingsSlider.classList.remove('open');
+                    if (!this.state.menuVisible) {
+                        this.toggleOverlay(false);
+                    }
+                }
+            }
+
+            hideSidebar() {
+                if (this.state.sidebarOpen) {
+                    this.state.sidebarOpen = false;
+                    this.elements.sidebar.classList.remove('open');
+                    if (!this.state.menuVisible && !this.state.controlsVisible) {
+                        this.toggleOverlay(false);
+                    }
+                }
             }
 
             // ===== READING FEATURES =====
