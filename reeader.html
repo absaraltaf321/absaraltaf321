@@ -572,6 +572,58 @@
             border-bottom: none;
         }
 
+        /* ===== AUTO-SCROLL PANEL ===== */
+        .auto-scroll-panel {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            background: var(--bg-accent);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: var(--border-radius-lg);
+            box-shadow: var(--shadow-heavy);
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 1500;
+            opacity: 0;
+            transform: translate(-50%, 150%);
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .auto-scroll-panel.visible {
+            opacity: 1;
+            transform: translate(-50%, 0);
+            pointer-events: auto;
+        }
+
+        .auto-scroll-panel .btn {
+            padding: 0.5rem;
+            font-size: 1rem;
+            line-height: 1;
+            border-radius: 50%;
+            min-width: 44px;
+            height: 44px;
+            justify-content: center;
+        }
+
+        .auto-scroll-panel .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .auto-scroll-panel .speed-control span {
+            font-size: 1.25rem;
+        }
+
+        .auto-scroll-panel .slider {
+            width: 140px;
+        }
+
         /* ===== RESPONSIVE DESIGN ===== */
         @media (max-width: 768px) {
             :root { --header-height: 56px; }
@@ -814,6 +866,10 @@
                 <span class="icon">🧘</span>
                 <span>Zen Mode (Z)</span>
             </div>
+            <div class="dropdown-menu-item" id="toggleAutoScroll">
+                <span class="icon">⏯️</span>
+                <span>Auto Play</span>
+            </div>
         </div>
         <div class="dropdown-menu-group">
              <div class="dropdown-menu-item" id="toggleTheme">
@@ -831,6 +887,17 @@
                <span>Clear Recent Files</span>
            </div>
        </div>
+    </div>
+
+    <!-- Auto-scroll Panel -->
+    <div class="auto-scroll-panel" id="autoScrollPanel">
+        <button id="autoScrollPlayPauseBtn" class="btn" title="Play/Pause">⏯️</button>
+        <div class="speed-control">
+            <span>🐢</span>
+            <input type="range" id="autoScrollSpeedSlider" min="1" max="10" value="3" class="slider" title="Adjust Speed">
+            <span>🐇</span>
+        </div>
+        <button id="autoScrollExitBtn" class="btn" title="Exit Autoplay">❌</button>
     </div>
     
     <script>
@@ -871,15 +938,115 @@
         }
 
 
+        // ===== IDBSTORAGE CLASS =====
+        class IDBStorage {
+            constructor(dbName = 'premium-reader-db', storeName = 'files') {
+                this.dbName = dbName;
+                this.storeName = storeName;
+                this.db = null;
+                this._initPromise = this._init();
+            }
+
+            async _init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.dbName, 1);
+
+                    request.onerror = (event) => {
+                        console.error("IndexedDB error:", event.target.error);
+                        reject("IndexedDB error: " + event.target.error);
+                    };
+
+                    request.onsuccess = (event) => {
+                        this.db = event.target.result;
+                        resolve(this.db);
+                    };
+
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains(this.storeName)) {
+                            db.createObjectStore(this.storeName);
+                        }
+                        if (!db.objectStoreNames.contains('settings')) {
+                            db.createObjectStore('settings');
+                        }
+                    };
+                });
+            }
+
+            async _getStore(storeName, mode) {
+                await this._initPromise;
+                const transaction = this.db.transaction(storeName, mode);
+                return transaction.objectStore(storeName);
+            }
+
+            async set(storeName, key, value) {
+                const store = await this._getStore(storeName, 'readwrite');
+                const request = store.put(value, key);
+                return new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async get(storeName, key) {
+                const store = await this._getStore(storeName, 'readonly');
+                const request = store.get(key);
+                return new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async getAll(storeName) {
+                const store = await this._getStore(storeName, 'readonly');
+                const request = store.getAll();
+                 return new Promise((resolve, reject) => {
+                    request.onsuccess = () => {
+                        const keysRequest = store.getAllKeys();
+                        keysRequest.onsuccess = () => {
+                            const result = new Map();
+                            const values = request.result;
+                            const keys = keysRequest.result;
+                            for(let i = 0; i < values.length; i++) {
+                                result.set(keys[i], values[i]);
+                            }
+                            resolve(result);
+                        }
+                        keysRequest.onerror = () => reject(keysRequest.error);
+                    };
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async delete(storeName, key) {
+                const store = await this._getStore(storeName, 'readwrite');
+                const request = store.delete(key);
+                return new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async clear(storeName) {
+                const store = await this._getStore(storeName, 'readwrite');
+                const request = store.clear();
+                return new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+        }
+
         // ===== APPLICATION CLASS =====
         class MarkdownReader {
             constructor() {
+                this.idbStore = new IDBStorage();
                 this.state = {
                     currentFile: null,
                     files: new Map(),
-                    settings: this.loadSettings(),
-                    readingPositions: this.loadJSON("readingPositions", {}),
-                    bookmarks: this.loadJSON("bookmarks", {}),
+                    settings: {},
+                    readingPositions: {},
+                    bookmarks: {},
                     isLoading: false,
                     currentSection: null,
                     focusMode: false,
@@ -889,12 +1056,14 @@
                     menuVisible: false,
                     lastScrollY: 0,
                     searchResults: [],
-                    currentSearchIndex: -1
+                    currentSearchIndex: -1,
+                    isAutoScrolling: false,
+                    isAutoScrollPaused: false,
+                    autoScrollSpeed: 3,
+                    autoScrollIntervalId: null
                 };
-                this.MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
                 this.elements = this.initializeElements();
-                this.init();
             }
 
             // ===== INITIALIZATION =====
@@ -909,7 +1078,8 @@
                     'searchCounter', 'searchPrevBtn', 'searchNextBtn', 'clearRecentsBtn',
                     'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn',
                     'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage',
-                    'pageOverlay'
+                    'pageOverlay',
+                    'toggleAutoScroll', 'autoScrollPanel', 'autoScrollPlayPauseBtn', 'autoScrollSpeedSlider', 'autoScrollExitBtn'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -918,12 +1088,19 @@
                 return elements;
             }
 
-            init() {
-                this.setupEventListeners();
+            async init() {
+                this.state.settings = await this.loadSettings();
+                this.state.readingPositions = await this.idbStore.get('settings', 'readingPositions') || {};
+                this.state.bookmarks = await this.idbStore.get('settings', 'bookmarks') || {};
+                
+                await this.loadFilesFromStorage();
+                
                 this.applySettings();
-                this.loadFilesFromStorage();
                 this.updateFileSelect();
                 this.setupCustomRenderer();
+                this.setupEventListeners();
+                
+                document.body.classList.add('app-initialized');
             }
 
             setupCustomRenderer() {
@@ -1046,6 +1223,12 @@
                 this.elements.highlightBtn.addEventListener('click', () => this.highlightSelection());
                 this.elements.boldBtn.addEventListener('click', () => this.formatSelection('b'));
                 this.elements.underlineBtn.addEventListener('click', () => this.formatSelection('u'));
+
+                // Auto-scroll listeners
+                this.elements.toggleAutoScroll.addEventListener('click', () => this.toggleAutoScroll());
+                this.elements.autoScrollPlayPauseBtn.addEventListener('click', () => this.togglePlayPauseAutoScroll());
+                this.elements.autoScrollSpeedSlider.addEventListener('input', (e) => this.updateAutoScrollSpeed(e.target.value));
+                this.elements.autoScrollExitBtn.addEventListener('click', () => this.stopAutoScroll());
             }
 
             handleTextSelection(event) {
@@ -1180,13 +1363,7 @@
             async processFiles(files) {
                 if (files.length === 0) return;
                 
-                const validFiles = files.filter(file => {
-                    if (file.size > this.MAX_FILE_SIZE) {
-                        this.showError(`File "${file.name}" is too large (max 5MB).`);
-                        return false;
-                    }
-                    return true;
-                });
+                const validFiles = Array.from(files);
 
                 if (validFiles.length === 0) return;
 
@@ -1197,7 +1374,7 @@
                     await Promise.all(readPromises);
                     
                     this.updateFileSelect();
-                    this.saveFilesToStorage();
+                    await this.saveFilesToStorage();
                     await this.loadFile(validFiles[0].name);
                 } catch (error) {
                     this.showError('Failed to process files: ' + error.message);
@@ -1274,16 +1451,16 @@
 
             async loadEpub(file) {
                 this.showLoading();
-                console.log("Loading EPUB file:", file.name);
                 try {
                     this.elements.markdownContent.innerHTML = `<div id="epub-content"></div>`;
+                    const epubContentDiv = this.elements.markdownContent.querySelector('#epub-content');
 
                     const zip = await JSZip.loadAsync(file.content);
+                    const parser = new DOMParser();
 
                     const containerXmlFile = zip.file("META-INF/container.xml");
                     if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
                     const containerXml = await containerXmlFile.async("string");
-                    const parser = new DOMParser();
                     const containerDoc = parser.parseFromString(containerXml, "application/xml");
                     const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
                     if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
@@ -1296,8 +1473,7 @@
                     const opfDoc = parser.parseFromString(opfXml, "application/xml");
 
                     const manifest = {};
-                    const manifestItems = opfDoc.getElementsByTagName("item");
-                    for (const item of manifestItems) {
+                    Array.from(opfDoc.getElementsByTagName("item")).forEach(item => {
                         const href = item.getAttribute("href");
                         if (href) {
                             manifest[item.getAttribute("id")] = {
@@ -1306,34 +1482,58 @@
                                 id: item.getAttribute("id")
                             };
                         }
-                    }
-
-                    const spine = [];
-                    const spineItems = opfDoc.getElementsByTagName("itemref");
-                    for (const item of spineItems) {
-                        spine.push(item.getAttribute("idref"));
-                    }
+                    });
                     
-                    // Store manifest and other data for TOC generation
+                    const spine = Array.from(opfDoc.getElementsByTagName("itemref")).map(item => item.getAttribute("idref"));
+                    
                     this.state.currentEpubManifest = manifest;
                     this.state.zip = zip;
                     const spineEl = opfDoc.getElementsByTagName("spine")[0];
                     this.state.currentEpubNcxId = spineEl?.getAttribute("toc");
 
-                    // Process content
-                    const content = await this.aggregateEpubContent(zip, manifest, spine);
-                    
-                    const epubContentDiv = this.elements.markdownContent.querySelector('#epub-content');
-                    epubContentDiv.innerHTML = content.html;
+                    // Process and append content directly to the DOM
+                    for (const idref of spine) {
+                        const manifestItem = manifest[idref];
+                        if (!manifestItem || !manifestItem.href) continue;
 
-                    const existingStyle = document.getElementById('epub-styles');
-                    if (existingStyle) existingStyle.remove();
-                    const styleElement = document.createElement('style');
-                    styleElement.id = 'epub-styles';
-                    styleElement.textContent = content.css;
-                    document.head.appendChild(styleElement);
+                        const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
+                        if (!htmlFile) continue;
+                        
+                        const rawHtml = await htmlFile.async('string');
+                        const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
+
+                        htmlDoc.querySelectorAll('script, link[rel="stylesheet"], style').forEach(el => el.remove());
+                        
+                        for (const tag of htmlDoc.querySelectorAll('img[src], image[href]')) {
+                            const attr = tag.hasAttribute('src') ? 'src' : 'href';
+                            const relativePath = tag.getAttribute(attr);
+                            if (!relativePath) continue;
+                            try {
+                                const absolutePath = this.resolveEpubPath(manifestItem.href, relativePath);
+                                const assetFile = zip.file(decodeURIComponent(absolutePath));
+                                if (assetFile) {
+                                    const blob = await assetFile.async('blob');
+                                    tag.setAttribute(attr, URL.createObjectURL(blob));
+                                }
+                            } catch (e) {
+                                console.warn(`Could not process asset ${relativePath}: ${e}`);
+                            }
+                        }
+                        
+                        if (htmlDoc.body) {
+                            const firstElement = htmlDoc.body.firstElementChild;
+                            if (firstElement) firstElement.id = `epub-section-${idref}`;
+                            
+                            // Remove all inline styles to prevent layout breakage
+                            htmlDoc.body.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
+
+                            Array.from(htmlDoc.body.childNodes).forEach(node => {
+                                epubContentDiv.appendChild(document.importNode(node, true));
+                            });
+                        }
+                    }
                     
-                    this.generateSidebarContent(); // Now this needs to handle EPUBs
+                    this.generateSidebarContent();
                     this.updateReadingStats();
                     this.setupContentObservers();
                     this.loadReadingPosition();
@@ -1346,68 +1546,6 @@
                 } finally {
                     this.hideLoading();
                 }
-            }
-
-            async aggregateEpubContent(zip, manifest, spine) {
-                let aggregatedHtml = '';
-                let aggregatedCss = '';
-                const parser = new DOMParser();
-
-                for (const id in manifest) {
-                    const item = manifest[id];
-                    if (item.mediaType === 'text/css') {
-                        const cssFile = zip.file(decodeURIComponent(item.href));
-                        if (cssFile) {
-                            const rawCss = await cssFile.async('string');
-                            aggregatedCss += this.scopeCss(rawCss, '#epub-content') + '\n';
-                        }
-                    }
-                }
-
-                for (const idref of spine) {
-                    const manifestItem = manifest[idref];
-                    if (!manifestItem || !manifestItem.href) continue;
-
-                    const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
-                    if (!htmlFile) continue;
-                    
-                    const rawHtml = await htmlFile.async('string');
-                    const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
-
-                    htmlDoc.querySelectorAll('script').forEach(s => s.remove());
-                    htmlDoc.querySelectorAll('link[rel="stylesheet"]').forEach(l => l.remove());
-                    
-                    const assetTags = htmlDoc.querySelectorAll('img[src], image[href]');
-                    for (const tag of assetTags) {
-                        const attr = tag.hasAttribute('src') ? 'src' : 'href';
-                        const relativePath = tag.getAttribute(attr);
-                        if (!relativePath) continue;
-
-                        try {
-                            const absolutePath = this.resolveEpubPath(manifestItem.href, relativePath);
-                            const assetFile = zip.file(decodeURIComponent(absolutePath));
-                            if (assetFile) {
-                                const mimeType = this.getMimeTypeFromPath(absolutePath);
-                                const blob = await assetFile.async('blob');
-                                const blobUrl = URL.createObjectURL(blob.slice(0, blob.size, mimeType));
-                                tag.setAttribute(attr, blobUrl);
-                            }
-                        } catch (e) {
-                            console.warn(`Could not process asset ${relativePath}: ${e}`);
-                        }
-                    }
-                    
-                    if (htmlDoc.body) {
-                        // Add an ID to the first element of each spine item for TOC navigation
-                        const firstElement = htmlDoc.body.firstElementChild;
-                        if (firstElement) {
-                            firstElement.id = `epub-section-${idref}`;
-                        }
-                        aggregatedHtml += htmlDoc.body.innerHTML;
-                    }
-                }
-
-                return { html: aggregatedHtml, css: aggregatedCss };
             }
             
             getMimeTypeFromPath(path) {
@@ -1866,6 +2004,64 @@
                     keyMap[event.key]();
                 }
             }
+
+            // ===== AUTO-SCROLL LOGIC =====
+            toggleAutoScroll() {
+                if (this.state.isAutoScrolling) {
+                    this.stopAutoScroll();
+                } else {
+                    this.startAutoScroll();
+                }
+                this.hideMenu();
+            }
+
+            startAutoScroll() {
+                if (this.state.isAutoScrolling) return;
+                this.state.isAutoScrolling = true;
+                this.state.isAutoScrollPaused = false;
+                this.elements.autoScrollPanel.classList.add('visible');
+                this.elements.autoScrollPlayPauseBtn.textContent = '⏸️';
+                this.setAutoScrollInterval();
+            }
+
+            stopAutoScroll() {
+                if (!this.state.isAutoScrolling) return;
+                this.state.isAutoScrolling = false;
+                this.elements.autoScrollPanel.classList.remove('visible');
+                clearInterval(this.state.autoScrollIntervalId);
+                this.state.autoScrollIntervalId = null;
+            }
+
+            togglePlayPauseAutoScroll() {
+                if (!this.state.isAutoScrolling) return;
+                this.state.isAutoScrollPaused = !this.state.isAutoScrollPaused;
+                if (this.state.isAutoScrollPaused) {
+                    clearInterval(this.state.autoScrollIntervalId);
+                    this.state.autoScrollIntervalId = null;
+                    this.elements.autoScrollPlayPauseBtn.textContent = '▶️';
+                } else {
+                    this.setAutoScrollInterval();
+                    this.elements.autoScrollPlayPauseBtn.textContent = '⏸️';
+                }
+            }
+
+            updateAutoScrollSpeed(speed) {
+                this.state.autoScrollSpeed = parseInt(speed, 10);
+                if (this.state.isAutoScrolling && !this.state.isAutoScrollPaused) {
+                    clearInterval(this.state.autoScrollIntervalId);
+                    this.setAutoScrollInterval();
+                }
+            }
+
+            setAutoScrollInterval() {
+                const delay = 55 - (this.state.autoScrollSpeed * 5);
+                this.state.autoScrollIntervalId = setInterval(() => {
+                    window.scrollBy(0, 1);
+                    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight) {
+                        this.stopAutoScroll();
+                    }
+                }, delay);
+            }
             
             // ===== ADVANCED FEATURES =====
             toggleSection(heading) {
@@ -1982,7 +2178,7 @@
                 closeModal('appModal');
             }
 
-            toggleBookmark(id, event) {
+            async toggleBookmark(id, event) {
                 event.stopPropagation(); // Prevent section from collapsing
                 const file = this.state.currentFile;
                 if (!this.state.bookmarks[file]) {
@@ -1995,7 +2191,7 @@
                 } else {
                     fileBookmarks.push(id); // Add bookmark
                 }
-                this.saveJSON('bookmarks', this.state.bookmarks);
+                await this.idbStore.set('settings', 'bookmarks', this.state.bookmarks);
                 this.generateSidebarContent(); // Regenerate to show new bookmark list
             }
 
@@ -2020,21 +2216,23 @@
             }
 
             // ===== SETTINGS & STORAGE =====
-            loadSettings() {
-                return this.loadJSON('markdownReaderSettingsV2', {
+            async loadSettings() {
+                const savedSettings = await this.idbStore.get('settings', 'markdownReaderSettingsV2');
+                const defaultSettings = {
                     theme: 'dark', fontSize: 18, lineHeight: 1.8, contentWidth: 65,
                     background: '1', fontFamily: 'serif', glassMorphism: false
-                });
+                };
+                return { ...defaultSettings, ...(savedSettings || {}) };
             }
 
-            saveSettings() {
-                this.saveJSON('markdownReaderSettingsV2', this.state.settings);
+            async saveSettings() {
+                await this.idbStore.set('settings', 'markdownReaderSettingsV2', this.state.settings);
             }
 
-            updateSetting(key, value) {
+            async updateSetting(key, value) {
                 this.state.settings[key] = value;
                 this.applySetting(key, value);
-                this.saveSettings();
+                await this.saveSettings();
             }
 
             applySetting(key, value) {
@@ -2074,10 +2272,10 @@
                 themeIcon.textContent = this.state.settings.theme === 'light' ? '🌙' : '☀️';
             }
 
-            saveReadingPosition() {
+            async saveReadingPosition() {
                 if (!this.state.currentFile) return;
                 this.state.readingPositions[this.state.currentFile] = window.scrollY;
-                this.saveJSON('readingPositions', this.state.readingPositions);
+                await this.idbStore.set('settings', 'readingPositions', this.state.readingPositions);
             }
 
             loadReadingPosition() {
@@ -2085,36 +2283,16 @@
                 setTimeout(() => window.scrollTo({ top: position, behavior: 'auto' }), 100);
             }
 
-            saveFilesToStorage() {
-                const filesToStore = new Map();
+            async saveFilesToStorage() {
                 for (const [filename, fileData] of this.state.files.entries()) {
-                    if (fileData.type === 'epub' && fileData.content instanceof ArrayBuffer) {
-                        const storableFileData = { ...fileData, content: this._arrayBufferToBase64(fileData.content) };
-                        filesToStore.set(filename, storableFileData);
-                    } else {
-                        filesToStore.set(filename, fileData);
-                    }
+                    await this.idbStore.set('files', filename, fileData);
                 }
-                this.saveJSON('markdownReaderFiles', Array.from(filesToStore.entries()));
             }
 
-            loadFilesFromStorage() {
-                const storedFiles = this.loadJSON('markdownReaderFiles', []);
-                const loadedFiles = new Map();
-                for (const [filename, fileData] of storedFiles) {
-                    // Check for old format (no type property) and provide backward compatibility
-                    if (!fileData.type) {
-                        fileData.type = 'markdown';
-                    }
-
-                    if (fileData.type === 'epub') {
-                        const loadedFileData = { ...fileData, content: this._base64ToArrayBuffer(fileData.content) };
-                        loadedFiles.set(filename, loadedFileData);
-                    } else {
-                        loadedFiles.set(filename, fileData);
-                    }
-                }
-                this.state.files = loadedFiles;
+            async loadFilesFromStorage() {
+                console.log("Loading files from IndexedDB...");
+                this.state.files = await this.idbStore.getAll('files');
+                console.log("Loaded files map:", this.state.files);
             }
 
             updateFileSelect() {
@@ -2134,53 +2312,17 @@
                 }
             }
 
-            clearRecentFiles() {
+            async clearRecentFiles() {
                 if (confirm("Are you sure you want to clear all recent files and associated data (reading positions, bookmarks)? This cannot be undone.")) {
-                    localStorage.removeItem('markdownReaderFiles');
-                    localStorage.removeItem('readingPositions');
-                    localStorage.removeItem('bookmarks');
+                    await Promise.all([
+                        this.idbStore.clear('files'),
+                        this.idbStore.clear('settings')
+                    ]);
                     window.location.reload();
                 }
             }
 
             // ===== UTILITY METHODS =====
-            _arrayBufferToBase64(buffer) {
-                let binary = '';
-                const bytes = new Uint8Array(buffer);
-                const len = bytes.byteLength;
-                for (let i = 0; i < len; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                return window.btoa(binary);
-            }
-
-            _base64ToArrayBuffer(base64) {
-                const binary_string = window.atob(base64);
-                const len = binary_string.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binary_string.charCodeAt(i);
-                }
-                return bytes.buffer;
-            }
-
-            loadJSON(key, defaultValue) {
-                try {
-                    const saved = localStorage.getItem(key);
-                    return saved ? JSON.parse(saved) : defaultValue;
-                } catch {
-                    return defaultValue;
-                }
-            }
-
-            saveJSON(key, value) {
-                try {
-                    localStorage.setItem(key, JSON.stringify(value));
-                } catch (e) {
-                    console.error("Error saving to localStorage", e);
-                    this.showError("Could not save data. Local storage may be full.");
-                }
-            }
 
             showLoading() {
                 this.state.isLoading = true;
@@ -2204,8 +2346,9 @@
 
         // ===== APP INITIALIZATION =====
         let app;
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             app = new MarkdownReader();
+            await app.init();
         });
     </script>
 </body>
