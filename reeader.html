@@ -99,18 +99,7 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* ===== BACKGROUND GRADIENTS ===== */
-        .bg-gradient-1 { background: var(--gradient-1); }
-        .bg-gradient-2 { background: var(--gradient-2); }
-        .bg-gradient-3 { background: var(--gradient-3); }
-        .bg-gradient-4 { background: var(--gradient-4); }
-        .bg-gradient-5 { background: var(--gradient-5); }
-        .bg-gradient-6 { background: var(--gradient-6); }
-        .bg-gradient-7 { background: var(--gradient-7); }
-        .bg-gradient-8 { background: var(--gradient-8); }
-        .bg-gradient-9 { background: var(--gradient-9); }
-        .bg-gradient-10 { background: var(--gradient-10); }
-
+        /* ===== BACKGROUND GRADIENTS & LIGHTS ===== */
         .background-overlay {
             position: fixed;
             top: 0;
@@ -122,6 +111,50 @@
             transition: opacity 0.5s ease;
             z-index: -1;
         }
+
+        .background-lights {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        
+        body.glass-morphism-active .background-lights {
+            opacity: 1;
+        }
+
+        .light {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.5;
+            transition: all 0.5s ease;
+        }
+
+        .light-layout-strips .light:first-child { top: 10%; left: -10%; width: 300px; height: 600px; }
+        .light-layout-strips .light:last-child { bottom: 10%; right: -10%; width: 300px; height: 600px; }
+        .light-layout-center .light:first-child { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 500px; height: 500px; }
+        .light-layout-center .light:last-child { display: none; }
+
+        .light-color-purple .light { background: radial-gradient(circle, #667eea, transparent 60%); }
+        .light-color-pink .light { background: radial-gradient(circle, #f5576c, transparent 60%); }
+        .light-color-cyan .light { background: radial-gradient(circle, #00f2fe, transparent 60%); }
+
+        .bg-gradient-1 { background: var(--gradient-1); }
+        .bg-gradient-2 { background: var(--gradient-2); }
+        .bg-gradient-3 { background: var(--gradient-3); }
+        .bg-gradient-4 { background: var(--gradient-4); }
+        .bg-gradient-5 { background: var(--gradient-5); }
+        .bg-gradient-6 { background: var(--gradient-6); }
+        .bg-gradient-7 { background: var(--gradient-7); }
+        .bg-gradient-8 { background: var(--gradient-8); }
+        .bg-gradient-9 { background: var(--gradient-9); }
+        .bg-gradient-10 { background: var(--gradient-10); }
 
         /* ===== HEADER & CONTROLS ===== */
         .header {
@@ -467,82 +500,99 @@
             display: flex;
             justify-content: center;
         }
+        
+        .initial-view .initial-view-container {
+            align-items: flex-start;
+            padding-top: 5vh;
+        }
 
-        .upload-box {
+        .initial-content {
+            width: 100%;
+            max-width: 500px;
+            padding: 0 1rem;
+        }
+
+        .initial-search-bar {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 3rem 4rem;
+            gap: 0.75rem;
             background: var(--bg-secondary);
-            border-radius: var(--border-radius-lg);
+            border-radius: var(--border-radius-sm);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1.5rem;
             border: 1px solid var(--border-color);
+        }
+
+        .initial-search-bar input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        .initial-search-bar input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .initial-upload-btn {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            justify-content: center;
+            margin-bottom: 3rem;
+            border-radius: var(--border-radius);
+        }
+
+        .recent-files-section h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        #initialRecentFilesList {
+            list-style: none;
+            padding: 0;
+        }
+
+        #initialRecentFilesList li {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            margin-bottom: 1rem;
             cursor: pointer;
             transition: all 0.2s ease;
-            text-align: center;
+            border: 1px solid transparent;
         }
 
-        .upload-box:hover {
-            transform: translateY(-5px);
-            box-shadow: var(--shadow-medium);
+        #initialRecentFilesList li:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-light);
             border-color: var(--accent-primary);
-            background: var(--bg-primary);
         }
 
-        .upload-box .upload-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+        #initialRecentFilesList .file-icon {
+            font-size: 1.5rem;
             color: var(--accent-primary);
         }
 
-        .upload-box .upload-text {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-
-        .initial-view-container {
-            display: flex;
-            gap: 2rem;
-            justify-content: center;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 2rem;
-        }
-
-        .initial-box {
+        #initialRecentFilesList .file-info {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 250px;
-            height: 250px;
-            background: var(--bg-secondary);
-            border-radius: var(--border-radius-lg);
-            border: 1px solid var(--border-color);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            padding: 2rem;
         }
 
-        .initial-box:hover {
-            transform: translateY(-10px);
-            box-shadow: var(--shadow-medium);
-            border-color: var(--accent-primary);
-        }
-
-        .box-icon {
-            font-size: 4rem;
-            margin-bottom: 1.5rem;
-            color: var(--accent-primary);
-        }
-
-        .box-text {
-            font-size: 1.25rem;
-            font-weight: 600;
+        #initialRecentFilesList .file-name {
+            font-weight: 500;
             color: var(--text-primary);
+        }
+
+        #initialRecentFilesList .file-modified {
+            font-size: 0.8rem;
+            color: var(--text-muted);
         }
         
         /* ===== FEATURE-SPECIFIC STYLES ===== */
@@ -673,6 +723,10 @@
 <body data-theme="dark" class="initial-view">
     <!-- Background Overlay -->
     <div class="background-overlay bg-gradient-1"></div>
+    <div class="background-lights" id="backgroundLights">
+        <div class="light"></div>
+        <div class="light"></div>
+    </div>
 
     <!-- Header -->
     <header class="header">
@@ -709,13 +763,22 @@
             <div class="markdown-content" id="markdownContent">
                 <!-- Initial View Container -->
                 <div class="initial-view-container" id="initialViewContainer">
-                    <div class="initial-box" id="mainUploadBox">
-                        <span class="box-icon">📁</span>
-                        <span class="box-text">Upload Document</span>
-                    </div>
-                    <div class="initial-box" id="recentFilesBox">
-                        <span class="box-icon">📄</span>
-                        <span class="box-text">Recent Files</span>
+                     <div class="initial-content">
+                        <div class="initial-search-bar">
+                            <span>🔍</span>
+                            <input type="text" placeholder="Search files...">
+                        </div>
+                        <button class="btn btn-primary initial-upload-btn" id="initialUploadBtn">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                            Upload Files
+                        </button>
+                        <div class="recent-files-section">
+                            <h2>Recent Files</h2>
+                            <ul id="initialRecentFilesList">
+                                <!-- Populated by JS -->
+                            </ul>
+                             <p id="initialNoRecentFilesMessage" style="display: none; text-align: center; color: var(--text-muted); margin-top: 2rem;">No recent files.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -789,6 +852,21 @@
                 </label>
             </div>
         </div>
+         <div class="control-group">
+            <div class="control-label">Light Style</div>
+            <select id="lightStyleSelect" class="btn" style="width: 100%; margin: 0;">
+                <option value="strips">Strips</option>
+                <option value="center">Center</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <div class="control-label">Light Color</div>
+            <select id="lightColorSelect" class="btn" style="width: 100%; margin: 0;">
+                <option value="purple">Purple</option>
+                <option value="pink">Pink</option>
+                <option value="cyan">Cyan</option>
+            </select>
+        </div>
     </div>
 
     <!-- Zen Mode Scroll Indicator -->
@@ -849,7 +927,7 @@
             <div class="dropdown-menu-item" id="recentFilesItem">
                  <span class="icon">📄</span>
                  <select id="fileSelectInMenu" title="Select from recent files">
-                     <option value="">Recent files...</option>
+                       <option value="">Recent files...</option>
                  </select>
             </div>
         </div>
@@ -1060,7 +1138,8 @@
                     isAutoScrolling: false,
                     isAutoScrollPaused: false,
                     autoScrollSpeed: 3,
-                    autoScrollIntervalId: null
+                    autoScrollRequestId: null,
+                    lastScrollTime: null
                 };
 
                 this.elements = this.initializeElements();
@@ -1073,13 +1152,14 @@
                     'contentWrapper', 'floatingSection', 'readingStats',
                     'settingsSlider', 'lightbox', 'dropZone', 'zenScrollIndicator',
                     'zenScrollThumb', 'menuToggleBtn', 'menuSlider', 'uploadBtn',
-                    'recentFilesItem', 'fileSelectInMenu', 'mainUploadBox', 'recentFilesBox', 'appModal',
+                    'recentFilesItem', 'fileSelectInMenu', 'appModal',
                     'modalTitle', 'modalBody', 'searchInput', 'searchContainer', 'searchControls',
                     'searchCounter', 'searchPrevBtn', 'searchNextBtn', 'clearRecentsBtn',
                     'selectionPopup', 'highlightBtn', 'boldBtn', 'underlineBtn',
                     'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage',
                     'pageOverlay',
-                    'toggleAutoScroll', 'autoScrollPanel', 'autoScrollPlayPauseBtn', 'autoScrollSpeedSlider', 'autoScrollExitBtn'
+                    'toggleAutoScroll', 'autoScrollPanel', 'autoScrollPlayPauseBtn', 'autoScrollSpeedSlider', 'autoScrollExitBtn',
+                    'initialUploadBtn', 'initialRecentFilesList', 'initialNoRecentFilesMessage', 'backgroundLights'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -1094,13 +1174,12 @@
                 this.state.bookmarks = await this.idbStore.get('settings', 'bookmarks') || {};
                 
                 await this.loadFilesFromStorage();
+                this.populateInitialRecentFilesList();
                 
                 this.applySettings();
                 this.updateFileSelect();
                 this.setupCustomRenderer();
                 this.setupEventListeners();
-                
-                document.body.classList.add('app-initialized');
             }
 
             setupCustomRenderer() {
@@ -1148,12 +1227,10 @@
                 this.elements.uploadBtn.addEventListener('click', () => this.elements.fileInput.click());
                 this.elements.fileSelectInMenu.addEventListener('change', (e) => this.loadFile(e.target.value));
 
-                if (this.elements.mainUploadBox) {
-                    this.elements.mainUploadBox.addEventListener('click', () => this.elements.fileInput.click());
+                if (this.elements.initialUploadBtn) {
+                    this.elements.initialUploadBtn.addEventListener('click', () => this.elements.fileInput.click());
                 }
-                if (this.elements.recentFilesBox) {
-                    this.elements.recentFilesBox.addEventListener('click', () => this.openRecentFilesModal());
-                }
+                
                 this.elements.closeRecentFilesModalBtn.addEventListener('click', () => this.closeRecentFilesModal());
 
                 this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
@@ -1181,6 +1258,8 @@
                 document.getElementById('backgroundSelect').addEventListener('change', (e) => this.updateSetting('background', e.target.value));
                 document.getElementById('fontFamilySelect').addEventListener('change', (e) => this.updateSetting('fontFamily', e.target.value));
                 document.getElementById('glassMorphismToggle').addEventListener('change', (e) => this.updateSetting('glassMorphism', e.target.checked));
+                document.getElementById('lightStyleSelect').addEventListener('change', (e) => this.updateSetting('lightStyle', e.target.value));
+                document.getElementById('lightColorSelect').addEventListener('change', (e) => this.updateSetting('lightColor', e.target.value));
 
                 const debouncedScroll = debounce(() => {
                     this.updateProgress();
@@ -1391,7 +1470,8 @@
                         this.state.files.set(file.name, {
                             name: file.name,
                             content: e.target.result,
-                            type: isEpub ? 'epub' : 'markdown'
+                            type: isEpub ? 'epub' : 'markdown',
+                            lastModified: file.lastModified
                         });
                         resolve();
                     };
@@ -1451,16 +1531,16 @@
 
             async loadEpub(file) {
                 this.showLoading();
+                console.log("Loading EPUB file:", file.name);
                 try {
                     this.elements.markdownContent.innerHTML = `<div id="epub-content"></div>`;
-                    const epubContentDiv = this.elements.markdownContent.querySelector('#epub-content');
 
                     const zip = await JSZip.loadAsync(file.content);
-                    const parser = new DOMParser();
 
                     const containerXmlFile = zip.file("META-INF/container.xml");
                     if (!containerXmlFile) throw new Error("META-INF/container.xml not found.");
                     const containerXml = await containerXmlFile.async("string");
+                    const parser = new DOMParser();
                     const containerDoc = parser.parseFromString(containerXml, "application/xml");
                     const opfPath = containerDoc.getElementsByTagName("rootfile")[0]?.getAttribute("full-path");
                     if (!opfPath) throw new Error("Could not find .opf file path in container.xml");
@@ -1473,7 +1553,8 @@
                     const opfDoc = parser.parseFromString(opfXml, "application/xml");
 
                     const manifest = {};
-                    Array.from(opfDoc.getElementsByTagName("item")).forEach(item => {
+                    const manifestItems = opfDoc.getElementsByTagName("item");
+                    for (const item of manifestItems) {
                         const href = item.getAttribute("href");
                         if (href) {
                             manifest[item.getAttribute("id")] = {
@@ -1482,58 +1563,34 @@
                                 id: item.getAttribute("id")
                             };
                         }
-                    });
+                    }
+
+                    const spine = [];
+                    const spineItems = opfDoc.getElementsByTagName("itemref");
+                    for (const item of spineItems) {
+                        spine.push(item.getAttribute("idref"));
+                    }
                     
-                    const spine = Array.from(opfDoc.getElementsByTagName("itemref")).map(item => item.getAttribute("idref"));
-                    
+                    // Store manifest and other data for TOC generation
                     this.state.currentEpubManifest = manifest;
                     this.state.zip = zip;
                     const spineEl = opfDoc.getElementsByTagName("spine")[0];
                     this.state.currentEpubNcxId = spineEl?.getAttribute("toc");
 
-                    // Process and append content directly to the DOM
-                    for (const idref of spine) {
-                        const manifestItem = manifest[idref];
-                        if (!manifestItem || !manifestItem.href) continue;
-
-                        const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
-                        if (!htmlFile) continue;
-                        
-                        const rawHtml = await htmlFile.async('string');
-                        const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
-
-                        htmlDoc.querySelectorAll('script, link[rel="stylesheet"], style').forEach(el => el.remove());
-                        
-                        for (const tag of htmlDoc.querySelectorAll('img[src], image[href]')) {
-                            const attr = tag.hasAttribute('src') ? 'src' : 'href';
-                            const relativePath = tag.getAttribute(attr);
-                            if (!relativePath) continue;
-                            try {
-                                const absolutePath = this.resolveEpubPath(manifestItem.href, relativePath);
-                                const assetFile = zip.file(decodeURIComponent(absolutePath));
-                                if (assetFile) {
-                                    const blob = await assetFile.async('blob');
-                                    tag.setAttribute(attr, URL.createObjectURL(blob));
-                                }
-                            } catch (e) {
-                                console.warn(`Could not process asset ${relativePath}: ${e}`);
-                            }
-                        }
-                        
-                        if (htmlDoc.body) {
-                            const firstElement = htmlDoc.body.firstElementChild;
-                            if (firstElement) firstElement.id = `epub-section-${idref}`;
-                            
-                            // Remove all inline styles to prevent layout breakage
-                            htmlDoc.body.querySelectorAll('[style]').forEach(el => el.removeAttribute('style'));
-
-                            Array.from(htmlDoc.body.childNodes).forEach(node => {
-                                epubContentDiv.appendChild(document.importNode(node, true));
-                            });
-                        }
-                    }
+                    // Process content
+                    const content = await this.aggregateEpubContent(zip, manifest, spine);
                     
-                    this.generateSidebarContent();
+                    const epubContentDiv = this.elements.markdownContent.querySelector('#epub-content');
+                    epubContentDiv.innerHTML = content.html;
+
+                    const existingStyle = document.getElementById('epub-styles');
+                    if (existingStyle) existingStyle.remove();
+                    const styleElement = document.createElement('style');
+                    styleElement.id = 'epub-styles';
+                    styleElement.textContent = content.css;
+                    document.head.appendChild(styleElement);
+                    
+                    this.generateSidebarContent(); // Now this needs to handle EPUBs
                     this.updateReadingStats();
                     this.setupContentObservers();
                     this.loadReadingPosition();
@@ -1546,6 +1603,68 @@
                 } finally {
                     this.hideLoading();
                 }
+            }
+
+            async aggregateEpubContent(zip, manifest, spine) {
+                let aggregatedHtml = '';
+                let aggregatedCss = '';
+                const parser = new DOMParser();
+
+                for (const id in manifest) {
+                    const item = manifest[id];
+                    if (item.mediaType === 'text/css') {
+                        const cssFile = zip.file(decodeURIComponent(item.href));
+                        if (cssFile) {
+                            const rawCss = await cssFile.async('string');
+                            aggregatedCss += this.scopeCss(rawCss, '#epub-content') + '\n';
+                        }
+                    }
+                }
+
+                for (const idref of spine) {
+                    const manifestItem = manifest[idref];
+                    if (!manifestItem || !manifestItem.href) continue;
+
+                    const htmlFile = zip.file(decodeURIComponent(manifestItem.href));
+                    if (!htmlFile) continue;
+                    
+                    const rawHtml = await htmlFile.async('string');
+                    const htmlDoc = parser.parseFromString(rawHtml, 'text/html');
+
+                    htmlDoc.querySelectorAll('script').forEach(s => s.remove());
+                    htmlDoc.querySelectorAll('link[rel="stylesheet"]').forEach(l => l.remove());
+                    
+                    const assetTags = htmlDoc.querySelectorAll('img[src], image[href]');
+                    for (const tag of assetTags) {
+                        const attr = tag.hasAttribute('src') ? 'src' : 'href';
+                        const relativePath = tag.getAttribute(attr);
+                        if (!relativePath) continue;
+
+                        try {
+                            const absolutePath = this.resolveEpubPath(manifestItem.href, relativePath);
+                            const assetFile = zip.file(decodeURIComponent(absolutePath));
+                            if (assetFile) {
+                                const mimeType = this.getMimeTypeFromPath(absolutePath);
+                                const blob = await assetFile.async('blob');
+                                const blobUrl = URL.createObjectURL(blob.slice(0, blob.size, mimeType));
+                                tag.setAttribute(attr, blobUrl);
+                            }
+                        } catch (e) {
+                            console.warn(`Could not process asset ${relativePath}: ${e}`);
+                        }
+                    }
+                    
+                    if (htmlDoc.body) {
+                        // Add an ID to the first element of each spine item for TOC navigation
+                        const firstElement = htmlDoc.body.firstElementChild;
+                        if (firstElement) {
+                            firstElement.id = `epub-section-${idref}`;
+                        }
+                        aggregatedHtml += htmlDoc.body.innerHTML;
+                    }
+                }
+
+                return { html: aggregatedHtml, css: aggregatedCss };
             }
             
             getMimeTypeFromPath(path) {
@@ -2021,46 +2140,56 @@
                 this.state.isAutoScrollPaused = false;
                 this.elements.autoScrollPanel.classList.add('visible');
                 this.elements.autoScrollPlayPauseBtn.textContent = '⏸️';
-                this.setAutoScrollInterval();
+                this.state.lastScrollTime = performance.now();
+                this.state.autoScrollRequestId = requestAnimationFrame((time) => this.autoScrollLoop(time));
             }
 
             stopAutoScroll() {
                 if (!this.state.isAutoScrolling) return;
                 this.state.isAutoScrolling = false;
                 this.elements.autoScrollPanel.classList.remove('visible');
-                clearInterval(this.state.autoScrollIntervalId);
-                this.state.autoScrollIntervalId = null;
+                if (this.state.autoScrollRequestId) {
+                    cancelAnimationFrame(this.state.autoScrollRequestId);
+                }
+                this.state.autoScrollRequestId = null;
             }
 
             togglePlayPauseAutoScroll() {
                 if (!this.state.isAutoScrolling) return;
                 this.state.isAutoScrollPaused = !this.state.isAutoScrollPaused;
                 if (this.state.isAutoScrollPaused) {
-                    clearInterval(this.state.autoScrollIntervalId);
-                    this.state.autoScrollIntervalId = null;
+                    if (this.state.autoScrollRequestId) {
+                        cancelAnimationFrame(this.state.autoScrollRequestId);
+                    }
+                    this.state.autoScrollRequestId = null;
                     this.elements.autoScrollPlayPauseBtn.textContent = '▶️';
                 } else {
-                    this.setAutoScrollInterval();
+                    this.state.lastScrollTime = performance.now();
+                    this.state.autoScrollRequestId = requestAnimationFrame((time) => this.autoScrollLoop(time));
                     this.elements.autoScrollPlayPauseBtn.textContent = '⏸️';
                 }
             }
 
             updateAutoScrollSpeed(speed) {
                 this.state.autoScrollSpeed = parseInt(speed, 10);
-                if (this.state.isAutoScrolling && !this.state.isAutoScrollPaused) {
-                    clearInterval(this.state.autoScrollIntervalId);
-                    this.setAutoScrollInterval();
-                }
             }
 
-            setAutoScrollInterval() {
-                const delay = 55 - (this.state.autoScrollSpeed * 5);
-                this.state.autoScrollIntervalId = setInterval(() => {
-                    window.scrollBy(0, 1);
-                    if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight) {
-                        this.stopAutoScroll();
-                    }
-                }, delay);
+            autoScrollLoop(currentTime) {
+                if (!this.state.isAutoScrolling || this.state.isAutoScrollPaused) return;
+
+                const deltaTime = currentTime - this.state.lastScrollTime;
+                this.state.lastScrollTime = currentTime;
+
+                const pixelsPerSecond = this.state.autoScrollSpeed * 10;
+                const scrollAmount = (pixelsPerSecond * deltaTime) / 1000;
+
+                window.scrollBy(0, scrollAmount);
+
+                if ((window.innerHeight + window.scrollY) >= document.documentElement.scrollHeight - 2) {
+                    this.stopAutoScroll();
+                } else {
+                    this.state.autoScrollRequestId = requestAnimationFrame((time) => this.autoScrollLoop(time));
+                }
             }
             
             // ===== ADVANCED FEATURES =====
@@ -2220,7 +2349,8 @@
                 const savedSettings = await this.idbStore.get('settings', 'markdownReaderSettingsV2');
                 const defaultSettings = {
                     theme: 'dark', fontSize: 18, lineHeight: 1.8, contentWidth: 65,
-                    background: '1', fontFamily: 'serif', glassMorphism: false
+                    background: '1', fontFamily: 'serif', glassMorphism: false,
+                    lightStyle: 'strips', lightColor: 'purple'
                 };
                 return { ...defaultSettings, ...(savedSettings || {}) };
             }
@@ -2251,7 +2381,17 @@
                         };
                         rootStyle.setProperty('--reading-font-family', fontMap[value]);
                     },
-                    'glassMorphism': () => document.body.classList.toggle('glass-morphism-active', value)
+                    'glassMorphism': () => document.body.classList.toggle('glass-morphism-active', value),
+                    'lightStyle': () => {
+                        const lights = this.elements.backgroundLights;
+                        lights.classList.remove('light-layout-strips', 'light-layout-center');
+                        lights.classList.add(`light-layout-${value}`);
+                    },
+                    'lightColor': () => {
+                        const lights = this.elements.backgroundLights;
+                        lights.classList.remove('light-color-purple', 'light-color-pink', 'light-color-cyan');
+                        lights.classList.add(`light-color-${value}`);
+                    }
                 };
                 if (settingMap[key]) settingMap[key]();
             }
@@ -2290,9 +2430,7 @@
             }
 
             async loadFilesFromStorage() {
-                console.log("Loading files from IndexedDB...");
                 this.state.files = await this.idbStore.getAll('files');
-                console.log("Loaded files map:", this.state.files);
             }
 
             updateFileSelect() {
@@ -2309,6 +2447,57 @@
                     this.elements.recentFilesItem.style.display = 'flex';
                 } else {
                     this.elements.recentFilesItem.style.display = 'none';
+                }
+                this.populateInitialRecentFilesList();
+            }
+            
+            populateInitialRecentFilesList() {
+                const list = this.elements.initialRecentFilesList;
+                const message = this.elements.initialNoRecentFilesMessage;
+                if (!list || !message) return;
+
+                list.innerHTML = '';
+
+                if (this.state.files.size > 0) {
+                    const sortedFiles = Array.from(this.state.files.values()).sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0));
+
+                    sortedFiles.forEach(file => {
+                        const li = document.createElement('li');
+                        
+                        const timeAgo = (timestamp) => {
+                            if (!timestamp) return 'Recently';
+                            const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+                            if (seconds < 60) return "Just now";
+                            let interval = seconds / 31536000;
+                            if (interval > 1) return Math.floor(interval) + " years ago";
+                            interval = seconds / 2592000;
+                            if (interval > 1) return Math.floor(interval) + " months ago";
+                            interval = seconds / 86400;
+                            if (interval > 1) return Math.floor(interval) + " days ago";
+                            interval = seconds / 3600;
+                            if (interval > 1) return Math.floor(interval) + " hours ago";
+                            interval = seconds / 60;
+                            if (interval > 1) return Math.floor(interval) + " minutes ago";
+                            return Math.floor(seconds) + " seconds ago";
+                        };
+
+                        li.innerHTML = `
+                            <span class="file-icon">📄</span>
+                            <div class="file-info">
+                                <span class="file-name">${file.name}</span>
+                                <span class="file-modified">Modified ${timeAgo(file.lastModified)}</span>
+                            </div>
+                        `;
+                        li.onclick = () => {
+                            this.loadFile(file.name);
+                        };
+                        list.appendChild(li);
+                    });
+                    message.style.display = 'none';
+                    list.style.display = 'block';
+                } else {
+                    message.style.display = 'block';
+                    list.style.display = 'none';
                 }
             }
 
@@ -2353,4 +2542,3 @@
     </script>
 </body>
 </html>
-
