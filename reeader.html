@@ -132,7 +132,7 @@
             position: absolute;
             border-radius: 50%;
             filter: blur(150px);
-            opacity: 0.5;
+            opacity: var(--light-intensity, 0.5);
             transition: all 0.5s ease;
         }
 
@@ -144,6 +144,9 @@
         .light-color-purple .light { background: radial-gradient(circle, #667eea, transparent 60%); }
         .light-color-pink .light { background: radial-gradient(circle, #f5576c, transparent 60%); }
         .light-color-cyan .light { background: radial-gradient(circle, #00f2fe, transparent 60%); }
+        .light-color-green .light { background: radial-gradient(circle, #43e97b, transparent 60%); }
+        .light-color-yellow .light { background: radial-gradient(circle, #fee140, transparent 60%); }
+        .light-color-orange .light { background: radial-gradient(circle, #ff7e5f, transparent 60%); }
 
         .bg-gradient-1 { background: var(--gradient-1); }
         .bg-gradient-2 { background: var(--gradient-2); }
@@ -583,11 +586,16 @@
         #initialRecentFilesList .file-info {
             display: flex;
             flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
         }
 
         #initialRecentFilesList .file-name {
             font-weight: 500;
             color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         #initialRecentFilesList .file-modified {
@@ -865,7 +873,14 @@
                 <option value="purple">Purple</option>
                 <option value="pink">Pink</option>
                 <option value="cyan">Cyan</option>
+                <option value="green">Green</option>
+                <option value="yellow">Yellow</option>
+                <option value="orange">Orange</option>
             </select>
+        </div>
+        <div class="control-group">
+            <div class="control-label">Light Intensity</div>
+            <input type="range" class="slider" id="lightIntensitySlider" min="0.1" max="1.0" value="0.5" step="0.1">
         </div>
     </div>
 
@@ -1159,7 +1174,8 @@
                     'recentFilesModal', 'closeRecentFilesModalBtn', 'modalRecentFilesList', 'modalNoRecentFilesMessage',
                     'pageOverlay',
                     'toggleAutoScroll', 'autoScrollPanel', 'autoScrollPlayPauseBtn', 'autoScrollSpeedSlider', 'autoScrollExitBtn',
-                    'initialUploadBtn', 'initialRecentFilesList', 'initialNoRecentFilesMessage', 'backgroundLights'
+                    'initialUploadBtn', 'initialRecentFilesList', 'initialNoRecentFilesMessage', 'backgroundLights',
+                    'lightIntensitySlider'
                 ];
                 const elements = {};
                 ids.forEach(id => elements[id] = document.getElementById(id));
@@ -1223,43 +1239,72 @@
 
             // ===== EVENT LISTENERS =====
             setupEventListeners() {
-                this.elements.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
-                this.elements.uploadBtn.addEventListener('click', () => this.elements.fileInput.click());
-                this.elements.fileSelectInMenu.addEventListener('change', (e) => this.loadFile(e.target.value));
+                if (this.elements.fileInput) this.elements.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+                if (this.elements.uploadBtn) this.elements.uploadBtn.addEventListener('click', () => this.elements.fileInput.click());
+                if (this.elements.fileSelectInMenu) this.elements.fileSelectInMenu.addEventListener('change', (e) => this.loadFile(e.target.value));
 
                 if (this.elements.initialUploadBtn) {
                     this.elements.initialUploadBtn.addEventListener('click', () => this.elements.fileInput.click());
                 }
                 
-                this.elements.closeRecentFilesModalBtn.addEventListener('click', () => this.closeRecentFilesModal());
+                if (this.elements.closeRecentFilesModalBtn) this.elements.closeRecentFilesModalBtn.addEventListener('click', () => this.closeRecentFilesModal());
 
-                this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
-                this.elements.searchInput.addEventListener('input', debounce(e => this.searchInDocument(e.target.value), 300));
-                this.elements.searchPrevBtn.addEventListener('click', () => this.navigateToSearchResult(false));
-                this.elements.searchNextBtn.addEventListener('click', () => this.navigateToSearchResult(true));
+                if (this.elements.menuToggleBtn) this.elements.menuToggleBtn.addEventListener('click', () => this.toggleMenu());
+                if (this.elements.searchInput) this.elements.searchInput.addEventListener('input', debounce(e => this.searchInDocument(e.target.value), 300));
+                if (this.elements.searchPrevBtn) this.elements.searchPrevBtn.addEventListener('click', () => this.navigateToSearchResult(false));
+                if (this.elements.searchNextBtn) this.elements.searchNextBtn.addEventListener('click', () => this.navigateToSearchResult(true));
 
                 // Menu items
-                document.getElementById('toggleTheme').addEventListener('click', () => this.toggleTheme());
-                document.getElementById('toggleSidebar').addEventListener('click', () => this.toggleSidebar());
-                document.getElementById('toggleFocus').addEventListener('click', () => this.toggleFocusMode());
-                document.getElementById('toggleZen').addEventListener('click', () => this.toggleZenMode());
-                document.getElementById('toggleControls').addEventListener('click', () => this.toggleControls());
-                this.elements.clearRecentsBtn.addEventListener('click', () => this.clearRecentFiles());
-                this.elements.pageOverlay.addEventListener('click', () => {
+                const toggleThemeBtn = document.getElementById('toggleTheme');
+                if (toggleThemeBtn) toggleThemeBtn.addEventListener('click', () => this.toggleTheme());
+                
+                const toggleSidebarBtn = document.getElementById('toggleSidebar');
+                if(toggleSidebarBtn) toggleSidebarBtn.addEventListener('click', () => this.toggleSidebar());
+
+                const toggleFocusBtn = document.getElementById('toggleFocus');
+                if(toggleFocusBtn) toggleFocusBtn.addEventListener('click', () => this.toggleFocusMode());
+                
+                const toggleZenBtn = document.getElementById('toggleZen');
+                if(toggleZenBtn) toggleZenBtn.addEventListener('click', () => this.toggleZenMode());
+
+                const toggleControlsBtn = document.getElementById('toggleControls');
+                if(toggleControlsBtn) toggleControlsBtn.addEventListener('click', () => this.toggleControls());
+                
+                if(this.elements.clearRecentsBtn) this.elements.clearRecentsBtn.addEventListener('click', () => this.clearRecentFiles());
+                if(this.elements.pageOverlay) this.elements.pageOverlay.addEventListener('click', () => {
                     this.hideMenu();
                     this.hideControls();
                     this.hideSidebar();
                 });
                 
                 // Controls Panel
-                document.getElementById('fontSizeSlider').addEventListener('input', (e) => this.updateSetting('fontSize', e.target.value));
-                document.getElementById('lineHeightSlider').addEventListener('input', (e) => this.updateSetting('lineHeight', e.target.value));
-                document.getElementById('contentWidthSlider').addEventListener('input', (e) => this.updateSetting('contentWidth', e.target.value));
-                document.getElementById('backgroundSelect').addEventListener('change', (e) => this.updateSetting('background', e.target.value));
-                document.getElementById('fontFamilySelect').addEventListener('change', (e) => this.updateSetting('fontFamily', e.target.value));
-                document.getElementById('glassMorphismToggle').addEventListener('change', (e) => this.updateSetting('glassMorphism', e.target.checked));
-                document.getElementById('lightStyleSelect').addEventListener('change', (e) => this.updateSetting('lightStyle', e.target.value));
-                document.getElementById('lightColorSelect').addEventListener('change', (e) => this.updateSetting('lightColor', e.target.value));
+                const fontSizeSlider = document.getElementById('fontSizeSlider');
+                if(fontSizeSlider) fontSizeSlider.addEventListener('input', (e) => this.updateSetting('fontSize', e.target.value));
+                
+                const lineHeightSlider = document.getElementById('lineHeightSlider');
+                if(lineHeightSlider) lineHeightSlider.addEventListener('input', (e) => this.updateSetting('lineHeight', e.target.value));
+                
+                const contentWidthSlider = document.getElementById('contentWidthSlider');
+                if(contentWidthSlider) contentWidthSlider.addEventListener('input', (e) => this.updateSetting('contentWidth', e.target.value));
+                
+                const backgroundSelect = document.getElementById('backgroundSelect');
+                if(backgroundSelect) backgroundSelect.addEventListener('change', (e) => this.updateSetting('background', e.target.value));
+                
+                const fontFamilySelect = document.getElementById('fontFamilySelect');
+                if(fontFamilySelect) fontFamilySelect.addEventListener('change', (e) => this.updateSetting('fontFamily', e.target.value));
+                
+                const glassMorphismToggle = document.getElementById('glassMorphismToggle');
+                if(glassMorphismToggle) glassMorphismToggle.addEventListener('change', (e) => this.updateSetting('glassMorphism', e.target.checked));
+                
+                const lightStyleSelect = document.getElementById('lightStyleSelect');
+                if(lightStyleSelect) lightStyleSelect.addEventListener('change', (e) => this.updateSetting('lightStyle', e.target.value));
+                
+                const lightColorSelect = document.getElementById('lightColorSelect');
+                if(lightColorSelect) lightColorSelect.addEventListener('change', (e) => this.updateSetting('lightColor', e.target.value));
+                
+                const lightIntensitySlider = document.getElementById('lightIntensitySlider');
+                if(lightIntensitySlider) lightIntensitySlider.addEventListener('input', (e) => this.updateSetting('lightIntensity', e.target.value));
+
 
                 const debouncedScroll = debounce(() => {
                     this.updateProgress();
@@ -1283,10 +1328,14 @@
                     });
                 });
                 ['dragenter', 'dragover'].forEach(eventName => {
-                    document.addEventListener(eventName, () => this.elements.dropZone.classList.add('active'));
+                    document.addEventListener(eventName, () => {
+                        if(this.elements.dropZone) this.elements.dropZone.classList.add('active')
+                    });
                 });
                 ['dragleave', 'drop'].forEach(eventName => {
-                    document.addEventListener(eventName, () => this.elements.dropZone.classList.remove('active'));
+                    document.addEventListener(eventName, () => {
+                         if(this.elements.dropZone) this.elements.dropZone.classList.remove('active')
+                    });
                 });
                 document.addEventListener('drop', (e) => this.handleDrop(e));
 
@@ -1297,17 +1346,21 @@
                     }
                 });
 
-                this.elements.markdownContent.addEventListener('mouseup', (e) => this.handleTextSelection(e));
-                this.elements.markdownContent.addEventListener('touchend', (e) => this.handleTextSelection(e));
-                this.elements.highlightBtn.addEventListener('click', () => this.highlightSelection());
-                this.elements.boldBtn.addEventListener('click', () => this.formatSelection('b'));
-                this.elements.underlineBtn.addEventListener('click', () => this.formatSelection('u'));
+                if(this.elements.markdownContent) {
+                    this.elements.markdownContent.addEventListener('mouseup', (e) => this.handleTextSelection(e));
+                    this.elements.markdownContent.addEventListener('touchend', (e) => this.handleTextSelection(e));
+                }
+                if(this.elements.highlightBtn) this.elements.highlightBtn.addEventListener('click', () => this.highlightSelection());
+                if(this.elements.boldBtn) this.elements.boldBtn.addEventListener('click', () => this.formatSelection('b'));
+                if(this.elements.underlineBtn) this.elements.underlineBtn.addEventListener('click', () => this.formatSelection('u'));
 
                 // Auto-scroll listeners
-                this.elements.toggleAutoScroll.addEventListener('click', () => this.toggleAutoScroll());
-                this.elements.autoScrollPlayPauseBtn.addEventListener('click', () => this.togglePlayPauseAutoScroll());
-                this.elements.autoScrollSpeedSlider.addEventListener('input', (e) => this.updateAutoScrollSpeed(e.target.value));
-                this.elements.autoScrollExitBtn.addEventListener('click', () => this.stopAutoScroll());
+                const toggleAutoScrollBtn = document.getElementById('toggleAutoScroll');
+                if(toggleAutoScrollBtn) toggleAutoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
+                
+                if(this.elements.autoScrollPlayPauseBtn) this.elements.autoScrollPlayPauseBtn.addEventListener('click', () => this.togglePlayPauseAutoScroll());
+                if(this.elements.autoScrollSpeedSlider) this.elements.autoScrollSpeedSlider.addEventListener('input', (e) => this.updateAutoScrollSpeed(e.target.value));
+                if(this.elements.autoScrollExitBtn) this.elements.autoScrollExitBtn.addEventListener('click', () => this.stopAutoScroll());
             }
 
             handleTextSelection(event) {
@@ -2350,7 +2403,7 @@
                 const defaultSettings = {
                     theme: 'dark', fontSize: 18, lineHeight: 1.8, contentWidth: 65,
                     background: '1', fontFamily: 'serif', glassMorphism: false,
-                    lightStyle: 'strips', lightColor: 'purple'
+                    lightStyle: 'strips', lightColor: 'purple', lightIntensity: 0.5
                 };
                 return { ...defaultSettings, ...(savedSettings || {}) };
             }
@@ -2389,9 +2442,10 @@
                     },
                     'lightColor': () => {
                         const lights = this.elements.backgroundLights;
-                        lights.classList.remove('light-color-purple', 'light-color-pink', 'light-color-cyan');
+                        lights.classList.remove('light-color-purple', 'light-color-pink', 'light-color-cyan', 'light-color-green', 'light-color-yellow', 'light-color-orange');
                         lights.classList.add(`light-color-${value}`);
-                    }
+                    },
+                    'lightIntensity': () => document.body.style.setProperty('--light-intensity', value)
                 };
                 if (settingMap[key]) settingMap[key]();
             }
