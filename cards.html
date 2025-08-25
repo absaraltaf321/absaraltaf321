@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcard Deck - Mobile Redesign</title>
+    <!-- External Libraries -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- New Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- Core Styles --- */
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #2E3440; /* Dark blue-gray background */
+        }
+
+        #deck-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 550px; /* Ensure container has height for centering */
+        }
+
+        .deck {
+            position: relative;
+            width: 200px; /* Base width for positioning */
+            height: 275px; /* Base height for positioning */
+            transform: translateZ(0);
+        }
+        
+        /* --- Card Styling with Glassmorphism --- */
+        .card {
+            width: 200px;
+            height: 275px;
+            border-radius: 12px; /* Softer radius */
+            box-shadow: 0px 8px 20px rgba(0, 0, 0, .5);
+            position: absolute;
+            top: 0px;
+            left: 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            padding: 8px;
+            box-sizing: border-box;
+            transition: 0.6s;
+            font-size: 18px;
+            z-index: 0;
+            /* Glassmorphism Effect */
+            background: rgba(216, 222, 233, 0.15); /* #D8DEE9 with alpha */
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .card.b {
+             background: rgba(216, 222, 233, 0.15);
+        }
+        .card.k {
+             background: rgba(76, 86, 106, 0.25); /* #4C566A with alpha */
+        }
+
+        .card p {
+            padding: 10px;
+            margin: 0;
+            color: #ECEFF4; /* Light text for all cards */
+            font-weight: 500;
+            text-shadow: 0px 1px 5px rgba(0, 0, 0, 0.7);
+        }
+        
+        /* --- Flip & Swipe Animations --- */
+        .flip-container {
+            perspective: 1000px;
+            z-index: 2;
+            position: absolute;
+            width: 200px;
+            height: 275px;
+            cursor: pointer;
+        }
+        
+        .flip-container.flip .flipper {
+            transform: rotateY(180deg); /* Flip in place */
+            z-index: 50;
+        }
+        
+        .flipper {
+            transition: transform 0.3s ease-out; /* This is for snapping back */
+            transform-style: preserve-3d;
+            position: relative;
+            transform-origin: center; /* Flip around the center */
+        }
+
+        .front, .back {
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200px; 
+            height: 275px;
+        }
+
+        .front { transform: rotateY(0deg); }
+        .back { transform: rotateY(180deg); }
+
+        /* Dismiss animation (for Next button) */
+        .flip-container.hide .flipper {
+            z-index: -1;
+            animation: animationFrames linear .9s;
+            animation-iteration-count: 1;
+        }
+        @keyframes animationFrames {
+            0% { transform: rotateY(180deg) scale(1); opacity: 1; }
+            50% { transform: rotateY(195deg) scale(0.8) translateX(-150%); opacity: 1;}
+            100% { transform: rotateY(180deg) scale(0.8) translateX(-150%); opacity: 0;}
+        }
+        
+        /* --- General UI & Side Panel --- */
+        .glassmorphism-panel {
+            background: rgba(67, 76, 94, 0.6);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+
+        /* --- Visual Tap Feedback --- */
+        #controls button {
+            transition: transform 0.1s ease-out, background-color 0.1s;
+        }
+        #controls button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        .category-item {
+             transition: transform 0.1s ease-out, background-color 0.1s;
+        }
+        .category-item:active {
+            transform: scale(0.98);
+            background-color: rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <div class="relative min-h-screen lg:flex">
+        <!-- Mobile Header -->
+        <header class="lg:hidden bg-gray-900/30 backdrop-blur-sm shadow-md sticky top-0 z-40">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <h1 class="text-xl font-bold text-white">
+                    <i class="fas fa-layer-group mr-2"></i>Flashcard Deck
+                </h1>
+                <button id="menu-toggle" class="text-2xl text-white">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Side Panel -->
+        <aside id="side-panel" class="fixed top-0 left-0 h-full w-80 lg:w-1/3 max-w-sm z-50 transform -translate-x-full lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out glassmorphism-panel flex flex-col p-6 shadow-2xl">
+            <div class="hidden lg:block mb-4">
+                 <h1 class="text-2xl font-bold text-white">
+                    <i class="fas fa-layer-group mr-2"></i>Flashcard Deck
+                </h1>
+            </div>
+            
+            <h2 class="text-xl font-bold mb-4 border-b border-gray-400/30 pb-2 text-white">Categories</h2>
+            <div class="flex mb-4">
+                <input type="text" id="newCategoryInput" class="flex-grow border border-gray-500 rounded-l-lg p-2 focus:ring-2 focus:ring-blue-400 focus:outline-none bg-gray-800/50 text-white placeholder-gray-400" placeholder="New category name...">
+                <button id="addCategoryBtn" class="bg-blue-600 text-white px-4 rounded-r-lg hover:bg-blue-700 font-bold">+</button>
+            </div>
+            <div id="categoryList" class="flex-grow overflow-y-auto custom-scrollbar pr-2"></div>
+            <div class="mt-6 pt-4 border-t border-gray-400/30">
+                <h3 class="text-lg font-semibold mb-2 text-white">Import / Export</h3>
+                <div class="flex items-center space-x-2">
+                    <button id="importBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg shadow"><i class="fas fa-upload mr-2"></i>Import</button>
+                    <input type="file" id="importFile" class="hidden" accept=".json">
+                    <button id="exportBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg shadow"><i class="fas fa-download mr-2"></i>Export</button>
+                </div>
+                 <pre class="bg-black/20 text-gray-300 text-xs p-3 mt-4 rounded-lg overflow-x-auto"><code>{
+  "Category": [
+    { "question": "Q1", "answer": "A1" }
+  ]
+}</code></pre>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="w-full flex-grow flex flex-col items-center justify-center p-4">
+            <div id="flashcard-viewer" class="w-full max-w-2xl">
+                <div class="flex justify-between items-center mb-4 px-4">
+                    <h2 id="categoryTitle" class="text-2xl font-bold text-white">Select a Category</h2>
+                    <span id="cardCounter" class="text-lg font-semibold text-gray-400">0 / 0</span>
+                </div>
+
+                <div id="deck-area" class="relative">
+                    <div class="deck">
+                        <div class="card" style="transform:rotateZ(-2deg) translateX(5px) translateY(5px);"></div>
+                        <div class="card" style="transform:rotateZ(6deg) translateX(-5px) translateY(-5px);"></div>
+                        <div id="flipcard" class="flip-container">
+                            <div class="flipper">
+                                <div class="front">
+                                    <div class="card b flex items-center justify-center text-center p-4"><p id="card-question"></p></div>
+                                </div>
+                                <div class="back">
+                                    <div class="card k flex items-center justify-center text-center p-4"><p id="card-answer"></p></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="no-cards-message" class="hidden absolute inset-0 bg-black/50 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-6 text-center">
+                        <i class="fas fa-box-open text-5xl text-gray-400 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-200">This category is empty!</h3>
+                    </div>
+                </div>
+
+                <div id="controls" class="mt-6 flex justify-center items-center space-x-2 md:space-x-4">
+                    <button id="prevBtn" class="bg-gray-700/80 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-gray-600 disabled:opacity-50"><i class="fas fa-arrow-left"></i></button>
+                    <button onclick="openModal()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow"><i class="fas fa-plus"></i></button>
+                    <button id="editBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-4 rounded-lg shadow"><i class="fas fa-pencil-alt"></i></button>
+                    <button id="deleteBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow"><i class="fas fa-trash"></i></button>
+                    <button id="nextBtn" class="bg-gray-700/80 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-gray-600 disabled:opacity-50"><i class="fas fa-arrow-right"></i></button>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Add/Edit Modal -->
+    <div id="cardModal" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[60] p-4">
+        <div class="glassmorphism-panel rounded-xl shadow-2xl p-8 w-full max-w-lg" id="modal-content">
+            <h2 id="modalTitle" class="text-2xl font-bold mb-6 text-white">Add New Card</h2>
+            <form id="cardForm">
+                <input type="hidden" id="editIndex">
+                <div class="mb-4">
+                    <label for="question" class="block text-sm font-medium text-gray-300 mb-1">Question</label>
+                    <textarea id="question" rows="4" class="w-full border border-gray-500 rounded-lg p-2 bg-gray-800/50 text-white" required></textarea>
+                </div>
+                <div class="mb-6">
+                    <label for="answer" class="block text-sm font-medium text-gray-300 mb-1">Answer</label>
+                    <textarea id="answer" rows="4" class="w-full border border-gray-500 rounded-lg p-2 bg-gray-800/50 text-white" required></textarea>
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" onclick="closeModal()" class="bg-gray-600/50 text-gray-200 font-semibold py-2 px-6 rounded-lg mr-4 hover:bg-gray-500/50">Cancel</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg">Save Card</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script>
+        $(document).ready(function() {
+            // --- STATE & TOUCH ---
+            let flashcardData = {};
+            let currentCategory = null;
+            let currentIndex = 0;
+            let touchStartX = 0;
+            let touchCurrentX = 0;
+            let isDragging = false;
+            let isAnimating = false;
+
+            // --- DOM ELEMENTS ---
+            const $sidePanel = $('#side-panel');
+            const $menuToggle = $('#menu-toggle');
+            const $categoryList = $('#categoryList');
+            const $newCategoryInput = $('#newCategoryInput');
+            const $categoryTitle = $('#categoryTitle');
+            const $cardCounter = $('#cardCounter');
+            const $flipcard = $('#flipcard');
+            const $cardQuestion = $('#card-question');
+            const $cardAnswer = $('#card-answer');
+            const $noCardsMessage = $('#no-cards-message');
+            const $controls = $('#controls');
+            const $deckArea = $('#deck-area');
+            const $prevBtn = $('#prevBtn');
+            const $nextBtn = $('#nextBtn');
+            const $cardModal = $('#cardModal');
+
+            // --- HELPER FUNCTIONS ---
+            function triggerHaptic() {
+                if (navigator.vibrate) {
+                    navigator.vibrate(10); // A short, 10ms vibration
+                }
+            }
+
+            // --- INITIALIZATION ---
+            function init() {
+                loadData();
+                renderCategories();
+                if (Object.keys(flashcardData).length > 0) {
+                    selectCategory(Object.keys(flashcardData)[0]);
+                } else {
+                    updateCardView();
+                }
+            }
+
+            // --- DATA HANDLING ---
+            function loadData() {
+                const data = localStorage.getItem('flashcardData');
+                flashcardData = data ? JSON.parse(data) : {
+                    "Getting Started": [
+                        { "question": "Click or Tap this card to flip it over.", "answer": "Swipe Left or Right to send this card to the back of the deck." },
+                        { "question": "Use the side panel to create your own categories and cards!", "answer": "Enjoy your personalized learning experience!" }
+                    ]
+                };
+            }
+            function saveData() { localStorage.setItem('flashcardData', JSON.stringify(flashcardData)); }
+
+            // --- UI & RENDERING ---
+            function renderCategories() {
+                $categoryList.empty();
+                Object.keys(flashcardData).forEach(category => {
+                    const isActive = category === currentCategory;
+                    const activeClass = isActive ? 'bg-blue-600 text-white shadow' : 'hover:bg-white/10';
+                    const btnClass = isActive ? 'text-white hover:text-red-300' : 'text-gray-400 hover:text-red-400';
+                    const categoryEl = $(`<div class="category-item flex justify-between items-center p-3 my-1 rounded-lg cursor-pointer ${activeClass}" data-category="${category}"><span class="font-medium">${category}</span><button data-category="${category}" class="delete-category-btn text-sm ${btnClass}"><i class="fas fa-trash"></i></button></div>`);
+                    $categoryList.append(categoryEl);
+                });
+            }
+            
+            function updateCardView() {
+                $flipcard.removeClass("flip hide");
+
+                if (!currentCategory || !flashcardData[currentCategory]) {
+                    $categoryTitle.text('Select a Category');
+                    $cardCounter.text('0 / 0');
+                    $deckArea.hide();
+                    $controls.hide();
+                    return;
+                }
+
+                $deckArea.show();
+                $controls.show();
+                
+                $categoryTitle.text(currentCategory);
+                const cards = flashcardData[currentCategory];
+
+                if (cards.length > 0 && cards[currentIndex]) {
+                    $noCardsMessage.hide();
+                    $flipcard.show();
+                    const card = cards[currentIndex];
+                    $cardQuestion.text(card.question);
+                    $cardAnswer.text(card.answer);
+                    $cardCounter.text(`${currentIndex + 1} / ${cards.length}`);
+                } else {
+                    $noCardsMessage.show();
+                    $flipcard.hide();
+                    $cardCounter.text('0 / 0');
+                }
+                
+                $prevBtn.prop('disabled', currentIndex === 0);
+                $nextBtn.prop('disabled', currentIndex >= cards.length - 1 || !$flipcard.hasClass('flip'));
+            }
+            
+            // --- CATEGORY MGMT ---
+            function addCategory() {
+                triggerHaptic();
+                const name = $newCategoryInput.val().trim();
+                if (name && !flashcardData[name]) {
+                    flashcardData[name] = [];
+                    saveData();
+                    $newCategoryInput.val('');
+                    selectCategory(name);
+                }
+            }
+
+            function selectCategory(category) {
+                triggerHaptic();
+                currentCategory = category;
+                currentIndex = 0;
+                renderCategories();
+                updateCardView();
+                if ($(window).width() < 1024) {
+                    $sidePanel.addClass('-translate-x-full');
+                }
+            }
+
+            // --- CARD MGMT & ANIMATION ---
+            function flipCard() {
+                if (isAnimating || isDragging || flashcardData[currentCategory]?.length === 0) return;
+                triggerHaptic();
+                $flipcard.toggleClass("flip");
+                $nextBtn.prop('disabled', currentIndex >= flashcardData[currentCategory].length - 1 || !$flipcard.hasClass('flip'));
+            }
+
+            function dismissAndShowNext() {
+                if (isAnimating || !$flipcard.hasClass("flip") || currentIndex >= flashcardData[currentCategory].length - 1) return;
+                triggerHaptic();
+                isAnimating = true;
+                $flipcard.addClass("hide").removeClass("flip");
+                $nextBtn.prop('disabled', true);
+
+                setTimeout(function() {
+                    currentIndex++;
+                    updateCardView();
+                    isAnimating = false;
+                }, 900);
+            }
+
+            function showPrevious() {
+                if (isAnimating || currentIndex === 0) return;
+                triggerHaptic();
+                currentIndex--;
+                updateCardView();
+            }
+
+            function sendCardToBack(direction) {
+                if (isAnimating || !flashcardData[currentCategory] || flashcardData[currentCategory].length <= 1) return;
+                isAnimating = true;
+
+                const cards = flashcardData[currentCategory];
+                const finalX = direction === 'left' ? -300 : 300;
+                const rotation = direction === 'left' ? -20 : 20;
+                
+                $flipcard.find('.flipper').css({
+                    'transition': 'transform 0.3s ease-in, opacity 0.3s ease-in',
+                    'transform': `translateX(${finalX}px) rotateZ(${rotation}deg) scale(0.7)`,
+                    'opacity': '0'
+                });
+
+                setTimeout(() => {
+                    const cardToMove = cards.splice(currentIndex, 1)[0];
+                    cards.push(cardToMove);
+                    if (currentIndex >= cards.length) {
+                        currentIndex = cards.length - 1;
+                    }
+                    saveData();
+                    
+                    $flipcard.find('.flipper').css({
+                        'transition': 'none',
+                        'transform': '',
+                        'opacity': '1'
+                    });
+
+                    updateCardView();
+                    isAnimating = false;
+                }, 300);
+            }
+            
+            // --- INTERACTIVE TOUCH CONTROLS ---
+            function handleTouchStart(e) {
+                if (isAnimating) return;
+                touchStartX = e.touches[0].clientX;
+                touchCurrentX = touchStartX;
+                isDragging = true;
+                $flipcard.find('.flipper').css('transition', 'none');
+            }
+
+            function handleTouchMove(e) {
+                if (!isDragging || isAnimating) return;
+                touchCurrentX = e.touches[0].clientX;
+                let deltaX = touchCurrentX - touchStartX;
+                let rotation = deltaX / 20;
+                $flipcard.find('.flipper').css('transform', `translateX(${deltaX}px) rotateZ(${rotation}deg)`);
+            }
+
+            function handleTouchEnd(e) {
+                if (!isDragging || isAnimating) return;
+                isDragging = false;
+                
+                $flipcard.find('.flipper').css('transition', 'transform 0.3s ease-out');
+
+                let deltaX = touchCurrentX - touchStartX;
+                const swipeThreshold = 80;
+
+                if (deltaX > swipeThreshold) {
+                    sendCardToBack('right');
+                } else if (deltaX < -swipeThreshold) {
+                    sendCardToBack('left');
+                } else {
+                    $flipcard.find('.flipper').css('transform', '');
+                    // Only flip if it was a small movement (a tap)
+                    if (Math.abs(deltaX) < 10) {
+                        flipCard();
+                    }
+                }
+                touchStartX = 0;
+                touchCurrentX = 0;
+            }
+
+            // --- MODAL & OTHER FUNCTIONS ---
+            window.openModal = (editMode = false) => {
+                 $('#cardForm')[0].reset();
+                if (editMode) {
+                    if (!currentCategory || flashcardData[currentCategory].length === 0) return;
+                    $('#modalTitle').text('Edit Card');
+                    const card = flashcardData[currentCategory][currentIndex];
+                    $('#question').val(card.question);
+                    $('#answer').val(card.answer);
+                    $('#editIndex').val(currentIndex);
+                } else {
+                    if (!currentCategory) { alert('Please select a category first.'); return; }
+                    $('#modalTitle').text('Add New Card');
+                    $('#editIndex').val('');
+                }
+                $cardModal.removeClass('hidden');
+            };
+            window.closeModal = () => $cardModal.addClass('hidden');
+            function handleFormSubmit(e) {
+                e.preventDefault();
+                 const question = $('#question').val().trim();
+                const answer = $('#answer').val().trim();
+                const editIndex = $('#editIndex').val();
+                if (question && answer) {
+                    if (editIndex !== '') {
+                        flashcardData[currentCategory][parseInt(editIndex)] = { question, answer };
+                    } else {
+                        flashcardData[currentCategory].push({ question, answer });
+                        currentIndex = flashcardData[currentCategory].length - 1;
+                    }
+                    saveData();
+                    updateCardView();
+                    closeModal();
+                }
+            }
+            function deleteCard() {
+                triggerHaptic();
+                if (!currentCategory || flashcardData[currentCategory].length === 0) return;
+                if (confirm('Delete this card?')) {
+                    flashcardData[currentCategory].splice(currentIndex, 1);
+                    saveData();
+                    if (currentIndex >= flashcardData[currentCategory].length) {
+                        currentIndex = Math.max(0, flashcardData[currentCategory].length - 1);
+                    }
+                    updateCardView();
+                }
+            }
+            function exportData() {
+                const dataStr = JSON.stringify(flashcardData, null, 2);
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(new Blob([dataStr], { type: 'application/json' }));
+                link.download = 'flashcard-deck.json';
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+            function importData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        flashcardData = JSON.parse(e.target.result);
+                        saveData();
+                        selectCategory(Object.keys(flashcardData)[0] || null);
+                    } catch (error) { alert(`Import failed: ${error.message}`); }
+                };
+                reader.readAsText(file);
+                event.target.value = '';
+            }
+
+            // --- EVENT LISTENERS ---
+            $menuToggle.on('click', () => $sidePanel.toggleClass('-translate-x-full'));
+            $('#addCategoryBtn').on('click', addCategory);
+            $newCategoryInput.on('keypress', (e) => e.key === 'Enter' && addCategory());
+            $categoryList.on('click', '.category-item', function(e) {
+                if (!$(e.target).closest('.delete-category-btn').length) {
+                    selectCategory($(this).data('category'));
+                }
+            });
+            $categoryList.on('click', '.delete-category-btn', function() {
+                deleteCategory($(this).data('category'));
+            });
+            
+            // Replaced simple click with touch events
+            $flipcard[0].addEventListener('touchstart', handleTouchStart, { passive: true });
+            $flipcard[0].addEventListener('touchmove', handleTouchMove, { passive: true });
+            $flipcard[0].addEventListener('touchend', handleTouchEnd, { passive: true });
+
+            $nextBtn.on('click', dismissAndShowNext);
+            $prevBtn.on('click', showPrevious);
+            $('#editBtn').on('click', () => openModal(true));
+            $('#deleteBtn').on('click', deleteCard);
+            $('#cardForm').on('submit', handleFormSubmit);
+            $('#exportBtn').on('click', exportData);
+            $('#importBtn').on('click', () => $('#importFile').click());
+            $('#importFile').on('change', importData);
+
+            init();
+        });
+    </script>
+</body>
+</html>
