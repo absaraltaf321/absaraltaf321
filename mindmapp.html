@@ -509,6 +509,10 @@
                 <i class="fas fa-folder-open"></i>
                 <span>Load</span>
             </button>
+            <button id="export-pdf-btn" class="btn btn-secondary" title="Export as PDF">
+                <i class="fas fa-file-pdf"></i>
+                <span>Export PDF</span>
+            </button>
         </div>
     </div>
 
@@ -591,6 +595,19 @@
              <i class="fas fa-palette"></i>
              <span>Change Connector Color</span>
         </div>
+        <div class="contextmenu-divider connector-option-divider"></div>
+        <div id="connector-style-solid" class="contextmenu-item connector-option">
+            <i class="fas fa-minus"></i>
+            <span>Style: Solid</span>
+        </div>
+        <div id="connector-style-dotted" class="contextmenu-item connector-option">
+            <i class="fas fa-ellipsis-h"></i>
+            <span>Style: Dotted</span>
+        </div>
+        <div id="toggle-arrowhead" class="contextmenu-item connector-option">
+            <i class="fas fa-location-arrow"></i>
+            <span>Toggle Arrowhead</span>
+        </div>
         <div class="contextmenu-divider"></div>
         <div id="delete-node-option" class="contextmenu-item danger">
             <i class="fas fa-trash"></i>
@@ -604,6 +621,10 @@
     <!-- Toast Notification Placeholder -->
     <!-- <div class="toast-notification">Message</div> -->
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
  
     <script>
@@ -659,6 +680,8 @@
                 this.nodeStartPos = { x: 0, y: 0 };
                 this.isTouch = false;
                 this.longPressTimeout = null;
+                this.isPinching = false;
+                this.pinchStartDistance = 0;
                 this.currentTheme = getInitialTheme(); // Track current theme
                 this.isFullscreen = !!document.fullscreenElement; // Track fullscreen state
 
@@ -695,6 +718,9 @@
                 this.changeConnectorColorOption = document.getElementById('change-connector-color-option');
                 this.deleteNodeOption = document.getElementById('delete-node-option');
                 this.connectorColorPicker = document.getElementById('connector-color-picker'); // Hidden input
+                this.connectorStyleSolid = document.getElementById('connector-style-solid');
+                this.connectorStyleDotted = document.getElementById('connector-style-dotted');
+                this.toggleArrowhead = document.getElementById('toggle-arrowhead');
                 this.zoomInBtn = document.getElementById('zoom-in');
                 this.zoomOutBtn = document.getElementById('zoom-out');
                 this.centerViewBtn = document.getElementById('center-view');
@@ -702,11 +728,19 @@
                 this.themeToggleBtn = document.getElementById('theme-toggle');
                 this.saveBtn = document.getElementById('save-btn');
                 this.loadBtn = document.getElementById('load-btn');
+                this.exportPdfBtn = document.getElementById('export-pdf-btn');
                 this.structureTree = document.getElementById('structure-tree');
                 this.modalCloseBtn = this.nodeModal.querySelector('.modal-close');
 
                 this.contextMenuNodeId = null;
                 this.rootNodeMap = new Map();
+
+                if (window.marked) {
+                    marked.setOptions({
+                        breaks: true,
+                        gfm: true,
+                    });
+                }
 
                 this.init();
             }
@@ -845,6 +879,7 @@
                 });
                 this.saveBtn.addEventListener('click', () => this.saveToFile());
                 this.loadBtn.addEventListener('click', () => this.loadFromFile());
+                this.exportPdfBtn.addEventListener('click', () => this.exportToPdf());
                 this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
                 this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
 
@@ -893,6 +928,10 @@
                          this.closeContextMenu();
                      }
                  });
+
+                 this.connectorStyleSolid.addEventListener('click', () => this.setConnectorStyle('solid'));
+                 this.connectorStyleDotted.addEventListener('click', () => this.setConnectorStyle('dotted'));
+                 this.toggleArrowhead.addEventListener('click', () => this.toggleConnectorArrowhead());
                  // Listener for the hidden color picker
                 this.connectorColorPicker.addEventListener('change', (e) => {
                      if (this.contextMenuNodeId !== null) {
@@ -1010,6 +1049,17 @@
                     e.preventDefault();
                  }
 
+                 // --- PINCH START ---
+                 if (e.touches && e.touches.length === 2) {
+                     this.isPinching = true;
+                     this.isPanning = false; // Ensure panning is off
+                     this.isMovingNode = false; // Ensure moving is off
+                     this.pinchStartDistance = this.getTouchDistance(e.touches);
+                     if (this.longPressTimeout) clearTimeout(this.longPressTimeout); // Cancel long press if it was about to fire
+                     return; // Don't process as a pan or node move
+                 }
+                 // --- END PINCH START ---
+
                  this.closeContextMenu();
                  const interactionPos = this.getInteractionPosition(e);
                  // Store initial drag start position, needed if long press occurs
@@ -1083,6 +1133,29 @@
              }
 
             handleInteractionMove(e) {
+                 // --- PINCH MOVE ---
+                 if (this.isPinching && e.touches && e.touches.length === 2) {
+                     if (this.isTouch) e.preventDefault();
+
+                     const newDist = this.getTouchDistance(e.touches);
+                     // Use a small epsilon to prevent division by zero or huge jumps
+                     if (this.pinchStartDistance > 0.01) {
+                        const factor = newDist / this.pinchStartDistance;
+
+                        const rect = this.canvasContainer.getBoundingClientRect();
+                        const pinchCenter = {
+                            x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
+                            y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top
+                        };
+
+                        this.zoomAtPoint(factor, pinchCenter.x, pinchCenter.y);
+                     }
+                     // Update the start distance for the next move event for smooth scaling
+                     this.pinchStartDistance = newDist;
+                     return; // Don't process as a pan or node move
+                 }
+                 // --- END PINCH MOVE ---
+
                  if (!this.isPanning && !this.isMovingNode) return;
                  if (this.isTouch) e.preventDefault();
 
@@ -1116,6 +1189,15 @@
             }
 
             handleInteractionEnd(e) {
+                 // --- PINCH END ---
+                 // If there are fewer than 2 touches left, any active pinch is over.
+                 if (this.isPinching && (!e.touches || e.touches.length < 2)) {
+                     this.isPinching = false;
+                     this.pinchStartDistance = 0;
+                     this.saveViewToLocalStorage();
+                 }
+                 // --- END PINCH END ---
+
                  // Check if a long press timer was active and clear it
                  if (this.longPressTimeout) {
                      console.log("Long Press Timer CANCELED due to touch end."); // <<< ADDED LOG
@@ -1154,6 +1236,12 @@
                 }
                 // For mouse events
                 return { clientX: e.clientX, clientY: e.clientY };
+            }
+
+            getTouchDistance(touches) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
             }
 
             handleContextMenu(e) {
@@ -1196,7 +1284,13 @@
                      this.contextMenuNodeId = nodeId;
                      // Show/Hide connector color option based on whether the node has a parent
                      const hasParent = this.connections.some(c => c.to === nodeId);
-                     this.changeConnectorColorOption.style.display = hasParent ? 'flex' : 'none'; // Use flex for alignment
+                     this.changeConnectorColorOption.style.display = hasParent ? 'flex' : 'none';
+                     document.querySelectorAll('.connector-option').forEach(el => {
+                         el.style.display = hasParent ? 'flex' : 'none';
+                     });
+                     document.querySelectorAll('.connector-option-divider').forEach(el => {
+                         el.style.display = hasParent ? 'block' : 'none';
+                     });
                      this.showContextMenu(clientX, clientY); // Pass the unified coordinates
                  } else {
                      console.log("   -> No node found at context menu position."); // Keep this log
@@ -1209,6 +1303,36 @@
                  const isOpen = this.sidebar.classList.contains('open');
                  const shouldOpen = typeof forceState === 'boolean' ? forceState : !isOpen;
                  this.sidebar.classList.toggle('open', shouldOpen);
+            }
+
+            setConnectorStyle(style) {
+                if (this.contextMenuNodeId !== null) {
+                    const node = this.getNodeById(this.contextMenuNodeId);
+                    if (node && node.parentId !== null) {
+                        const connection = this.connections.find(c => c.from === node.parentId && c.to === node.id);
+                        if (connection) {
+                            connection.style = style;
+                            this.updateConnections();
+                            this.saveToLocalStorage();
+                        }
+                    }
+                    this.closeContextMenu();
+                }
+            }
+
+            toggleConnectorArrowhead() {
+                if (this.contextMenuNodeId !== null) {
+                    const node = this.getNodeById(this.contextMenuNodeId);
+                    if (node && node.parentId !== null) {
+                        const connection = this.connections.find(c => c.from === node.parentId && c.to === node.id);
+                        if (connection) {
+                            connection.arrowhead = !connection.arrowhead;
+                            this.updateConnections();
+                            this.saveToLocalStorage();
+                        }
+                    }
+                    this.closeContextMenu();
+                }
             }
 
             // --- ID Management, Coordinates, Node Helpers ---
@@ -1272,11 +1396,27 @@
 
             updateNodeElementContent(element, nodeData) {
                  if (!element) return;
-                 const safeTitle = nodeData.title?.replace(/</g, "<") || 'Untitled';
-                 const safeContent = nodeData.content?.replace(/</g, "<").replace(/\n/g, '<br>') || '';
+
+                 // Ensure marked and DOMPurify are available
+                 if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+                     // Fallback to original behavior if libraries are not loaded, with a fix for HTML escaping
+                     const safeTitle = (nodeData.title || 'Untitled').replace(/</g, "&lt;");
+                     const safeContent = (nodeData.content || '').replace(/</g, "&lt;").replace(/\n/g, '<br>');
+                     element.innerHTML = `
+                         <div class="node-title">${safeTitle}</div>
+                         ${safeContent ? `<div class="node-content">${safeContent}</div>` : ''}
+                     `;
+                     return;
+                 }
+
+                 // Use marked.parseInline for the title to avoid block-level elements like <p>
+                 const titleHtml = DOMPurify.sanitize(marked.parseInline(nodeData.title || 'Untitled'));
+                 // Use marked.parse for the content to allow for lists, etc.
+                 const contentHtml = DOMPurify.sanitize(marked.parse(nodeData.content || ''));
+
                  element.innerHTML = `
-                     <div class="node-title">${safeTitle}</div>
-                     ${safeContent ? `<div class="node-content">${safeContent}</div>` : ''}
+                     <div class="node-title">${titleHtml}</div>
+                     ${contentHtml ? `<div class="node-content">${contentHtml}</div>` : ''}
                  `;
             }
 
@@ -1415,6 +1555,25 @@
              updateConnections() {
                 this.connectorSvg.innerHTML = '';
 
+                // Define arrowhead marker
+                const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+                const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+                marker.setAttribute('id', 'arrowhead');
+                marker.setAttribute('viewBox', '0 0 10 10');
+                marker.setAttribute('refX', '8');
+                marker.setAttribute('refY', '5');
+                marker.setAttribute('markerWidth', '6');
+                marker.setAttribute('markerHeight', '6');
+                marker.setAttribute('orient', 'auto-start-reverse');
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+                // A neutral gray color for the arrowhead. It won't match the line color yet.
+                path.setAttribute('fill', '#a0aec0'); 
+                marker.appendChild(path);
+                defs.appendChild(marker);
+                this.connectorSvg.appendChild(defs);
+
+
                 // Validate node map before proceeding
                 if (this.rootNodeMap.size !== this.nodes.length && this.nodes.length > 0) {
                     console.warn("Root map size mismatch, rebuilding before drawing connections.");
@@ -1461,6 +1620,17 @@
                             line.setAttribute('x2', toX);
                             line.setAttribute('y2', toY);
                             line.style.stroke = color;
+                            // Use a default thickness if not specified
+                            line.style.strokeWidth = (conn.thickness || 2.5) + 'px';
+
+                            // Apply styles
+                            if (conn.style === 'dotted') {
+                                line.setAttribute('stroke-dasharray', '2, 6');
+                            }
+
+                            if (conn.arrowhead) {
+                                line.setAttribute('marker-end', 'url(#arrowhead)');
+                            }
 
                             // Set class for potential styling through CSS
                             line.classList.add('connector-line');
@@ -2145,6 +2315,149 @@
                      this.fullscreenToggleBtn.setAttribute('data-tooltip', 'Enter Fullscreen');
                  }
              }
+
+async exportToPdf() {
+            if (typeof window.jspdf === 'undefined' || !window.html2canvas) {
+                this.showToast('PDF generation libraries not loaded.', true);
+                return;
+            }
+            if (this.nodes.length === 0) {
+                this.showToast('Cannot export an empty mind map.', true);
+                return;
+            }
+            
+            this.showToast('Generating PDF, please wait...');
+
+            // Create a temporary, off-screen container for the clean export version
+            const exportContainer = document.createElement('div');
+            exportContainer.id = 'mindmap-export-container';
+            // Position it off-screen so the user doesn't see it
+            Object.assign(exportContainer.style, {
+                position: 'absolute',
+                left: '-9999px',
+                top: '-9999px',
+                padding: '0',
+                margin: '0',
+                backgroundColor: getComputedStyle(this.canvasContainer).backgroundColor
+            });
+            document.body.appendChild(exportContainer);
+
+            try {
+                // 1. Calculate the final dimensions of the content
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                this.nodes.forEach(node => {
+                    const element = this.getNodeElement(node.id);
+                    if (element && element.offsetWidth > 0) {
+                        const nodeX = typeof node.x === 'number' ? node.x : 0;
+                        const nodeY = typeof node.y === 'number' ? node.y : 0;
+                        minX = Math.min(minX, nodeX);
+                        minY = Math.min(minY, nodeY);
+                        maxX = Math.max(maxX, nodeX + element.offsetWidth);
+                        maxY = Math.max(maxY, nodeY + element.offsetHeight);
+                    }
+                });
+
+                const padding = 20;
+                const contentWidth = (maxX - minX) + (padding * 2);
+                const contentHeight = (maxY - minY) + (padding * 2);
+
+                // Set the size of our export container
+                exportContainer.style.width = `${contentWidth}px`;
+                exportContainer.style.height = `${contentHeight}px`;
+
+                // 2. Clone nodes and reposition them inside the clean container
+                this.nodes.forEach(node => {
+                    const originalElement = this.getNodeElement(node.id);
+                    if (!originalElement) return;
+
+                    const clonedNode = originalElement.cloneNode(true);
+                    clonedNode.classList.remove('selected'); // Ensure no 'selected' border
+                    
+                    // Reposition the node relative to the new container's top-left corner
+                    const newX = (node.x - minX) + padding;
+                    const newY = (node.y - minY) + padding;
+                    
+                    Object.assign(clonedNode.style, {
+                        position: 'absolute',
+                        // Use left/top instead of transform for simplicity
+                        left: `${newX}px`,
+                        top: `${newY}px`,
+                        transform: '' // Remove the original transform
+                    });
+                    exportContainer.appendChild(clonedNode);
+                });
+
+                // 3. Re-create the SVG and connectors with updated coordinates
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                Object.assign(svg.style, {
+                    position: 'absolute',
+                    top: '0',
+                    left: '0',
+                    width: '100%',
+                    height: '100%',
+                    overflow: 'visible'
+                });
+
+                this.connections.forEach(conn => {
+                    const fromNode = this.getNodeById(conn.from);
+                    const toNode = this.getNodeById(conn.to);
+                    const fromElement = this.getNodeElement(fromNode.id);
+                    const toElement = this.getNodeElement(toNode.id);
+                    if (!fromNode || !toNode || !fromElement || !toElement) return;
+
+                    // Calculate new line coordinates relative to the clean container
+                    const fromX = (fromNode.x - minX) + padding + (fromElement.offsetWidth / 2);
+                    const fromY = (fromNode.y - minY) + padding + (fromElement.offsetHeight / 2);
+                    const toX = (toNode.x - minX) + padding + (toElement.offsetWidth / 2);
+                    const toY = (toNode.y - minY) + padding + (toElement.offsetHeight / 2);
+                    
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', fromX);
+                    line.setAttribute('y1', fromY);
+                    line.setAttribute('x2', toX);
+                    line.setAttribute('y2', toY);
+
+                    // Re-apply styles from the original SVG lines
+                    const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--connector-default-color').trim();
+                    line.style.stroke = conn.color || this.getBranchColor(toNode.id) || defaultColor;
+                    line.style.strokeWidth = getComputedStyle(document.documentElement).getPropertyValue('--connector-width');
+                    line.style.strokeLinecap = 'round';
+                    if (conn.style === 'dotted') {
+                        line.setAttribute('stroke-dasharray', '2, 6');
+                    }
+                    svg.appendChild(line);
+                });
+                
+                // Add the new SVG to the container, making sure it's underneath the nodes
+                exportContainer.insertBefore(svg, exportContainer.firstChild);
+                
+                // 4. Capture the clean, simple, off-screen container
+                const { jsPDF } = window.jspdf;
+                const canvas = await html2canvas(exportContainer, {
+                    scale: 2, // A scale of 2 is usually sufficient and faster here
+                    logging: false,
+                    useCORS: true
+                });
+
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                const pdf = new jsPDF({
+                    orientation: canvas.width > canvas.height ? 'l' : 'p',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`mindmap-${new Date().toISOString().slice(0,10)}.pdf`);
+                this.showToast('PDF exported successfully!');
+
+            } catch (error) {
+                console.error('Error exporting to PDF:', error);
+                this.showToast('Failed to export PDF.', true);
+            } finally {
+                // 5. IMPORTANT: Always remove the temporary container
+                document.body.removeChild(exportContainer);
+            }
+        }
 
         } // End MindMap Class
 
