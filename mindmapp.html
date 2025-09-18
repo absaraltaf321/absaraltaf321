@@ -438,6 +438,17 @@
 
 
         /* Mobile Adjustments */
+        #mobile-menu-toggle { display: none; }
+
+        .canvas-fullscreen-active .header,
+        .canvas-fullscreen-active .sidebar {
+            display: none;
+        }
+
+        .canvas-container:fullscreen {
+            background-color: var(--canvas-bg);
+        }
+
         @media (max-width: 768px) {
             :root {
                 --sidebar-width: 220px;
@@ -447,11 +458,38 @@
                 min-height: 60px;
             }
             .logo { font-size: 1.2rem; }
-             .toolbar .btn span { display: none; }
-             .toolbar .btn { padding: 0.6rem; }
-             .toolbar .btn i { font-size: 1.1rem; margin: 0; }
-             .toolbar { gap: 0.3rem; }
-
+            .toolbar {
+                gap: 0.3rem;
+                position: relative;
+            }
+            .toolbar-actions {
+                display: none;
+                position: absolute;
+                top: 100%;
+                right: 0;
+                background-color: var(--background);
+                border: 1px solid var(--border);
+                border-radius: 0.5rem;
+                box-shadow: var(--shadow-lg);
+                z-index: 20;
+                padding: 0.5rem;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
+            }
+            .toolbar-actions.mobile-menu-open {
+                display: flex;
+            }
+            .toolbar-actions .btn {
+                justify-content: flex-start;
+                width: 100%;
+            }
+            .toolbar-actions .btn span {
+                display: inline-block;
+            }
+            #mobile-menu-toggle {
+                display: inline-flex;
+            }
             #sidebar-toggle { display: inline-flex; } /* Show toggle */
             .sidebar {
                 position: absolute;
@@ -497,33 +535,69 @@
             <button id="theme-toggle" title="Toggle Theme">
                 <i class="fas fa-sun"></i> <!-- Icon changes dynamically -->
             </button>
-            <button id="new-node-btn" class="btn btn-primary" title="Add Root Node">
-                <i class="fas fa-plus"></i>
-                <span>Add Root</span>
-            </button>
-            <button id="save-btn" class="btn btn-secondary" title="Save to File">
-                <i class="fas fa-save"></i>
-                <span>Save</span>
-            </button>
-            <button id="load-btn" class="btn btn-secondary" title="Load from File">
-                <i class="fas fa-folder-open"></i>
-                <span>Load</span>
-            </button>
-            <button id="export-pdf-btn" class="btn btn-secondary" title="Export as PDF">
-                <i class="fas fa-file-pdf"></i>
-                <span>Export PDF</span>
+            
+            <div class="toolbar-actions">
+                <button id="new-node-btn" class="btn btn-primary" title="Add Root Node">
+                    <i class="fas fa-plus"></i>
+                    <span>Add Root</span>
+                </button>
+                <button id="save-btn" class="btn btn-secondary" title="Save to File">
+                    <i class="fas fa-save"></i>
+                    <span>Save</span>
+                </button>
+                <button id="load-btn" class="btn btn-secondary" title="Load from File">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Load</span>
+                </button>
+                <button id="import-export-btn" class="btn btn-secondary" title="Import/Export JSON">
+                    <i class="fas fa-exchange-alt"></i>
+                    <span>JSON</span>
+                </button>
+                <button id="export-pdf-btn" class="btn btn-secondary" title="Export as PDF">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Export PDF</span>
+                </button>
+                <button id="fullscreen-toggle" class="btn btn-secondary" title="Enter Fullscreen">
+                    <i class="fas fa-expand"></i>
+                    <span>Fullscreen</span>
+                </button>
+            </div>
+            <button id="mobile-menu-toggle" class="btn btn-secondary">
+                <i class="fas fa-ellipsis-v"></i>
             </button>
         </div>
     </div>
 
     <div class="container">
         <div id="sidebar" class="sidebar">
+            <div class="sidebar-title">Layouts</div>
+            <div style="padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+                <button id="tree-layout-btn" class="btn btn-secondary" style="width: 100%;">
+                    <i class="fas fa-sitemap"></i>
+                    <span>Horizontal Tree</span>
+                </button>
+                <button id="vertical-tree-layout-btn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;">
+                    <i class="fas fa-ruler-vertical"></i>
+                    <span>Vertical Tree</span>
+                </button>
+                <button id="radial-layout-btn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;">
+                    <i class="fas fa-bullseye"></i>
+                    <span>Radial</span>
+                </button>
+                <button id="organic-layout-btn" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;">
+                    <i class="fas fa-leaf"></i>
+                    <span>Organic</span>
+                </button>
+            </div>
             <div class="sidebar-title">Mind Map Structure</div>
             <div id="structure-tree"></div>
         </div>
         <div class="canvas-container">
             <svg id="connector-svg"></svg>
             <div id="canvas"></div>
+            <button id="exit-fullscreen-btn" class="control-btn mini-tooltip" data-tooltip="Exit Fullscreen" style="display: none; position: absolute; top: 1rem; right: 1rem; z-index: 10;">
+                <i class="fas fa-compress"></i>
+            </button>
         </div>
     </div>
 
@@ -536,9 +610,6 @@
         </button>
         <button id="center-view" class="control-btn mini-tooltip" data-tooltip="Center View">
             <i class="fas fa-compress-arrows-alt"></i>
-        </button>
-        <button id="fullscreen-toggle" class="control-btn mini-tooltip" data-tooltip="Toggle Fullscreen">
-            <i class="fas fa-expand"></i> <!-- Icon changes dynamically -->
         </button>
     </div>
 
@@ -579,6 +650,36 @@
                     <button type="submit" id="save-node" class="btn btn-primary">Save</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="json-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Import / Export JSON</h3>
+                <button class="modal-close" title="Close">×</button>
+            </div>
+            
+            <!-- Export Section -->
+            <div class="form-group">
+                <label class="form-label" for="json-export-area">Export Mind Map</label>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Copy the JSON data below to save your mind map as text.</p>
+                <textarea id="json-export-area" class="form-textarea" readonly rows="8"></textarea>
+            </div>
+    
+            <div class="contextmenu-divider" style="margin: 1.5rem 0;"></div>
+    
+            <!-- Import Section -->
+            <div class="form-group">
+                <label class="form-label" for="json-import-area">Import Mind Map</label>
+                 <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">Paste your mind map's JSON data here. This will replace your current mind map.</p>
+                <textarea id="json-import-area" class="form-textarea" rows="8" placeholder="Paste your JSON data here..."></textarea>
+            </div>
+    
+            <div class="modal-footer">
+                <button type="button" id="cancel-json-import" class="btn btn-secondary">Cancel</button>
+                <button type="button" id="load-from-json-btn" class="btn btn-primary">Load from Text</button>
+            </div>
         </div>
     </div>
 
@@ -732,6 +833,28 @@
                 this.structureTree = document.getElementById('structure-tree');
                 this.modalCloseBtn = this.nodeModal.querySelector('.modal-close');
 
+                // JSON Import/Export Elements
+                this.importExportBtn = document.getElementById('import-export-btn');
+                this.jsonModal = document.getElementById('json-modal');
+                this.jsonExportArea = document.getElementById('json-export-area');
+                this.jsonImportArea = document.getElementById('json-import-area');
+                this.loadFromJsonBtn = document.getElementById('load-from-json-btn');
+                this.cancelJsonImportBtn = document.getElementById('cancel-json-import');
+                this.jsonModalCloseBtn = this.jsonModal.querySelector('.modal-close');
+
+                // Layout Elements
+                this.treeLayoutBtn = document.getElementById('tree-layout-btn');
+                this.verticalTreeLayoutBtn = document.getElementById('vertical-tree-layout-btn');
+                this.radialLayoutBtn = document.getElementById('radial-layout-btn');
+                this.organicLayoutBtn = document.getElementById('organic-layout-btn');
+
+                // Mobile Menu Elements
+                this.mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+                this.toolbarActions = document.querySelector('.toolbar-actions');
+
+                // Fullscreen Exit Button
+                this.exitFullscreenBtn = document.getElementById('exit-fullscreen-btn');
+
                 this.contextMenuNodeId = null;
                 this.rootNodeMap = new Map();
 
@@ -879,9 +1002,30 @@
                 });
                 this.saveBtn.addEventListener('click', () => this.saveToFile());
                 this.loadBtn.addEventListener('click', () => this.loadFromFile());
+                this.importExportBtn.addEventListener('click', () => this.openJsonModal());
                 this.exportPdfBtn.addEventListener('click', () => this.exportToPdf());
                 this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
                 this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+
+                // JSON Modal Listeners
+                this.loadFromJsonBtn.addEventListener('click', () => {
+                    const jsonString = this.jsonImportArea.value.trim();
+                    if (jsonString) {
+                        if (confirm('Loading from text will replace your current mind map. Continue?')) {
+                            this.loadFromJSON(jsonString);
+                        }
+                    } else {
+                        this.showToast('Import area is empty.', true);
+                    }
+                });
+                this.cancelJsonImportBtn.addEventListener('click', () => this.closeJsonModal());
+                this.jsonModalCloseBtn.addEventListener('click', () => this.closeJsonModal());
+
+                // Layout Listeners
+                this.treeLayoutBtn.addEventListener('click', () => this.runLayout(this.applyTreeLayout));
+                this.verticalTreeLayoutBtn.addEventListener('click', () => this.runLayout(this.applyVerticalTreeLayout));
+                this.radialLayoutBtn.addEventListener('click', () => this.runLayout(this.applyRadialLayout));
+                this.organicLayoutBtn.addEventListener('click', () => this.runLayout(this.applyOrganicMindMapLayout));
 
                 // Context Menu Options
                 this.addChildOption.addEventListener('click', () => {
@@ -968,13 +1112,23 @@
                 this.zoomOutBtn.addEventListener('click', () => { this.zoom(0.8); this.saveViewToLocalStorage(); });
                 this.centerViewBtn.addEventListener('click', () => { this.centerView(true); this.saveViewToLocalStorage(); });
                 this.fullscreenToggleBtn.addEventListener('click', () => this.toggleFullscreen());
+                this.exitFullscreenBtn.addEventListener('click', () => this.toggleFullscreen()); // Can use the same toggle function
                 document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
 
 
                 // Global Click/Tap Listener
+                this.mobileMenuToggle.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.toolbarActions.classList.toggle('mobile-menu-open');
+                });
+
                 document.addEventListener('click', (e) => {
                     if (!this.contextMenu.contains(e.target)) {
                          this.closeContextMenu();
+                    }
+                    // Close mobile menu if clicking outside
+                    if (this.toolbarActions.classList.contains('mobile-menu-open') && !this.toolbarActions.contains(e.target) && !this.mobileMenuToggle.contains(e.target)) {
+                        this.toolbarActions.classList.remove('mobile-menu-open');
                     }
                     if (e.target === this.nodeModal) {
                          this.closeModal();
@@ -1441,6 +1595,368 @@
                     const yPos = typeof node.y === 'number' ? node.y : 0;
                     targetElement.style.transform = `translate(${xPos}px, ${yPos}px)`;
                 }
+            }
+
+            // --- Layout Engine ---
+            runLayout(layoutFunction) {
+                if (this.nodes.length > 0) {
+                    layoutFunction.call(this);
+                    if (window.innerWidth <= 768 && this.sidebar.classList.contains('open')) {
+                        this.toggleSidebar(false);
+                    }
+                } else {
+                    this.showToast('Cannot apply layout to an empty map.');
+                }
+            }
+
+            applyTreeLayout() {
+                console.log("Applying Horizontal Tree Layout...");
+                const hSpacing = 250; // Horizontal spacing between levels
+                const vSpacing = 40;  // Vertical spacing between siblings
+
+                const childrenMap = new Map();
+                this.nodes.forEach(n => childrenMap.set(n.id, []));
+                this.connections.forEach(c => {
+                    if (childrenMap.has(c.from)) {
+                        childrenMap.get(c.from).push(c.to);
+                    }
+                });
+
+                const rootNodes = this.nodes.filter(n => this.getParentId(n.id) === null);
+                if (rootNodes.length === 0 && this.nodes.length > 0) {
+                     // Fallback: if no formal roots, pick nodes with no parents in connections list
+                     const childIds = new Set(this.connections.map(c => c.to));
+                     rootNodes.push(...this.nodes.filter(n => !childIds.has(n.id)));
+                     if (rootNodes.length === 0) rootNodes.push(this.nodes[0]); // Absolute fallback
+                }
+
+
+                const nodeHeights = new Map();
+                const calculateNodeHeight = (nodeId) => {
+                    if (nodeHeights.has(nodeId)) return nodeHeights.get(nodeId);
+
+                    const element = this.getNodeElement(nodeId);
+                    const elementHeight = element ? element.offsetHeight : 50;
+                    const children = childrenMap.get(nodeId) || [];
+
+                    if (children.length === 0) {
+                        nodeHeights.set(nodeId, elementHeight);
+                        return elementHeight;
+                    }
+
+                    let childrenHeight = 0;
+                    children.forEach(childId => {
+                        childrenHeight += calculateNodeHeight(childId);
+                    });
+
+                    const totalHeight = childrenHeight + (children.length - 1) * vSpacing;
+                    nodeHeights.set(nodeId, Math.max(elementHeight, totalHeight));
+                    return Math.max(elementHeight, totalHeight);
+                };
+                
+                this.nodes.forEach(n => calculateNodeHeight(n.id));
+
+                let currentY = 0;
+                const timeline = gsap.timeline({
+                    onComplete: () => {
+                        this.updateConnections();
+                        this.saveToLocalStorage();
+                        this.centerView(true);
+                        console.log("Tree Layout application complete.");
+                    }
+                });
+
+                const positionNode = (nodeId, depth, yOffset) => {
+                    const node = this.getNodeById(nodeId);
+                    const element = this.getNodeElement(nodeId);
+                    if (!node || !element) return;
+
+                    const children = childrenMap.get(nodeId) || [];
+                    const nodeHeight = nodeHeights.get(nodeId);
+                    const elementHeight = element.offsetHeight;
+                    
+                    const newX = depth * hSpacing;
+                    const newY = yOffset + (nodeHeight / 2) - (elementHeight / 2);
+
+                    if (isFinite(newX) && isFinite(newY)) {
+                        timeline.to(node, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(node) }, "<");
+                    } else {
+                        console.error(`Invalid position calculated in Horizontal Tree Layout for node ${node.id}:`, {newX, newY});
+                    }
+
+                    let childYOffset = yOffset;
+                    children.forEach(childId => {
+                        positionNode(childId, depth + 1, childYOffset);
+                        childYOffset += nodeHeights.get(childId) + vSpacing;
+                    });
+                };
+
+                rootNodes.forEach(rootNode => {
+                    positionNode(rootNode.id, 0, currentY);
+                    currentY += nodeHeights.get(rootNode.id) + vSpacing * 2;
+                });
+            }
+
+            applyVerticalTreeLayout() {
+                console.log("Applying Vertical Tree Layout...");
+                const hSpacing = 40;
+                const vSpacing = 120;
+
+                const childrenMap = new Map();
+                this.nodes.forEach(n => childrenMap.set(n.id, []));
+                this.connections.forEach(c => childrenMap.has(c.from) && childrenMap.get(c.from).push(c.to));
+                const rootNodes = this.nodes.filter(n => this.getParentId(n.id) === null);
+
+                const nodeWidths = new Map();
+                const calculateNodeWidth = (nodeId) => {
+                    if (nodeWidths.has(nodeId)) return nodeWidths.get(nodeId);
+                    const element = this.getNodeElement(nodeId);
+                    const elementWidth = element ? element.offsetWidth : 150;
+                    const children = childrenMap.get(nodeId) || [];
+                    if (children.length === 0) {
+                        nodeWidths.set(nodeId, elementWidth);
+                        return elementWidth;
+                    }
+                    let childrenWidth = children.reduce((sum, childId) => sum + calculateNodeWidth(childId), 0);
+                    const totalWidth = childrenWidth + (children.length - 1) * hSpacing;
+                    nodeWidths.set(nodeId, Math.max(elementWidth, totalWidth));
+                    return Math.max(elementWidth, totalWidth);
+                };
+                this.nodes.forEach(n => calculateNodeWidth(n.id));
+
+                let currentX = 0;
+                const timeline = gsap.timeline({ onComplete: () => { this.updateConnections(); this.saveToLocalStorage(); this.centerView(true); } });
+
+                const positionNode = (nodeId, depth, xOffset) => {
+                    const node = this.getNodeById(nodeId);
+                    const element = this.getNodeElement(nodeId);
+                    if (!node || !element) return;
+
+                    const children = childrenMap.get(nodeId) || [];
+                    const nodeWidth = nodeWidths.get(nodeId);
+                    const elementWidth = element.offsetWidth;
+                    const newX = xOffset + (nodeWidth / 2) - (elementWidth / 2);
+                    const newY = depth * vSpacing;
+
+                    if (isFinite(newX) && isFinite(newY)) {
+                        timeline.to(node, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(node) }, "<");
+                    } else {
+                        console.error(`Invalid position calculated in Vertical Tree Layout for node ${node.id}:`, {newX, newY});
+                    }
+
+                    let childXOffset = xOffset;
+                    children.forEach(childId => {
+                        positionNode(childId, depth + 1, childXOffset);
+                        childXOffset += nodeWidths.get(childId) + hSpacing;
+                    });
+                };
+
+                rootNodes.forEach(rootNode => {
+                    positionNode(rootNode.id, 0, currentX);
+                    currentX += nodeWidths.get(rootNode.id) + hSpacing * 2;
+                });
+            }
+
+            applyRadialLayout() {
+                console.log("Applying Radial Layout...");
+                const rootNodes = this.nodes.filter(n => this.getParentId(n.id) === null);
+                if (rootNodes.length === 0) {
+                    this.showToast("Radial layout requires at least one root node.", true);
+                    return;
+                }
+
+                const childrenMap = new Map();
+                this.nodes.forEach(n => childrenMap.set(n.id, []));
+                this.connections.forEach(c => childrenMap.has(c.from) && childrenMap.get(c.from).push(c.to));
+
+                const timeline = gsap.timeline({ onComplete: () => { this.updateConnections(); this.saveToLocalStorage(); this.centerView(true); } });
+
+                // --- PASS 1: Measure subtree dimensions ---
+                const subtreeDimensions = new Map();
+                const calculateSubtreeDimensions = (nodeId) => {
+                    if (subtreeDimensions.has(nodeId)) return subtreeDimensions.get(nodeId);
+
+                    const element = this.getNodeElement(nodeId);
+                    const nodeWidth = element ? element.offsetWidth : 150;
+                    const nodeHeight = element ? element.offsetHeight : 50;
+                    const children = childrenMap.get(nodeId) || [];
+
+                    if (children.length === 0) {
+                        const dims = { width: nodeWidth, height: nodeHeight, radius: Math.max(nodeWidth, nodeHeight) / 2 };
+                        subtreeDimensions.set(nodeId, dims);
+                        return dims;
+                    }
+
+                    let requiredCircumference = 0;
+                    const padding = 30;
+                    children.forEach(childId => {
+                        const childDims = calculateSubtreeDimensions(childId);
+                        requiredCircumference += childDims.radius * 2 + padding;
+                    });
+                    
+                    const radius = requiredCircumference / (2 * Math.PI);
+                    const totalDiameter = radius * 2 + nodeWidth;
+                    const dims = { width: totalDiameter, height: totalDiameter, radius: totalDiameter / 2 };
+                    subtreeDimensions.set(nodeId, dims);
+                    return dims;
+                };
+
+                this.nodes.forEach(n => {
+                    if (!subtreeDimensions.has(n.id)) {
+                        calculateSubtreeDimensions(n.id);
+                    }
+                });
+
+                // --- PASS 2: Position nodes ---
+                const positionChildren = (parentId, center_x, center_y) => {
+                    const children = childrenMap.get(parentId) || [];
+                    if (children.length === 0) return;
+
+                    const padding = 40;
+                    let requiredCircumference = 0;
+                    children.forEach(childId => {
+                        const childDims = subtreeDimensions.get(childId);
+                        requiredCircumference += childDims.radius * 2 + padding;
+                    });
+
+                    const radius = requiredCircumference / (2 * Math.PI);
+                    let currentAngle = 0;
+
+                    children.forEach(childId => {
+                        const node = this.getNodeById(childId);
+                        const childDims = subtreeDimensions.get(childId);
+                        const angleForThisChild = (childDims.radius * 2 + padding) / radius;
+                        const placeAngle = currentAngle + angleForThisChild / 2;
+                        
+                        const newX = center_x + radius * Math.cos(placeAngle);
+                        const newY = center_y + radius * Math.sin(placeAngle);
+
+                        if (isFinite(newX) && isFinite(newY)) {
+                            timeline.to(node, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(node) }, "<");
+                            positionChildren(childId, newX, newY);
+                        } else {
+                            console.error(`Invalid position calculated in Radial Layout for node ${node.id}:`, {newX, newY});
+                        }
+                        currentAngle += angleForThisChild;
+                    });
+                };
+
+                let totalWidth = 0;
+                const rootPadding = 100;
+                rootNodes.forEach(root => {
+                    const dims = subtreeDimensions.get(root.id);
+                    totalWidth += dims.width + rootPadding;
+                });
+
+                let currentX = -totalWidth / 2;
+                rootNodes.forEach((root) => {
+                    const rootNode = this.getNodeById(root.id);
+                    const dims = subtreeDimensions.get(root.id);
+                    const newX = currentX + dims.width / 2;
+                    const newY = 0;
+                    timeline.to(rootNode, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(rootNode) }, "<");
+                    positionChildren(root.id, newX, newY);
+                    currentX += dims.width + rootPadding;
+                });
+            }
+
+            applyOrganicMindMapLayout() {
+                console.log("Applying Organic Layout...");
+                const rootNodes = this.nodes.filter(n => this.getParentId(n.id) === null);
+                if (rootNodes.length === 0) {
+                    this.showToast("Organic layout requires at least one root node.", true);
+                    return;
+                }
+
+                const childrenMap = new Map();
+                this.nodes.forEach(n => childrenMap.set(n.id, []));
+                this.connections.forEach(c => childrenMap.has(c.from) && childrenMap.get(c.from).push(c.to));
+                const timeline = gsap.timeline({ onComplete: () => { this.updateConnections(); this.saveToLocalStorage(); this.centerView(true); } });
+
+                // --- PASS 1: Measure subtree dimensions ---
+                const branchDimensions = new Map();
+                const calculateBranchDimensions = (nodeId) => {
+                    if (branchDimensions.has(nodeId)) return branchDimensions.get(nodeId);
+                    
+                    const element = this.getNodeElement(nodeId);
+                    const nodeWidth = element ? element.offsetWidth : 150;
+                    const nodeHeight = element ? element.offsetHeight : 50;
+                    const children = childrenMap.get(nodeId) || [];
+
+                    if (children.length === 0) {
+                        const dims = { width: nodeWidth, height: nodeHeight };
+                        branchDimensions.set(nodeId, dims);
+                        return dims;
+                    }
+
+                    let totalHeight = 0;
+                    let maxWidth = 0;
+                    const vPadding = 20;
+                    children.forEach(childId => {
+                        const childDims = calculateBranchDimensions(childId);
+                        totalHeight += childDims.height;
+                        maxWidth = Math.max(maxWidth, childDims.width);
+                    });
+
+                    const hPadding = 100;
+                    const finalWidth = nodeWidth + hPadding + maxWidth;
+                    const finalHeight = Math.max(nodeHeight, totalHeight + (children.length - 1) * vPadding);
+                    const dims = { width: finalWidth, height: finalHeight };
+                    branchDimensions.set(nodeId, dims);
+                    return dims;
+                };
+                this.nodes.forEach(n => { if (!branchDimensions.has(n.id)) calculateBranchDimensions(n.id); });
+
+                // --- PASS 2: Position nodes ---
+                const positionBranch = (nodes, parentX, parentY, direction) => {
+                    const vPadding = 40;
+                    let totalHeight = 0;
+                    nodes.forEach(nodeId => { totalHeight += branchDimensions.get(nodeId).height; });
+                    totalHeight += (nodes.length - 1) * vPadding;
+
+                    let currentY = parentY - totalHeight / 2;
+
+                    nodes.forEach(nodeId => {
+                        const node = this.getNodeById(nodeId);
+                        const dims = branchDimensions.get(nodeId);
+                        const hPadding = 150;
+                        const newX = parentX + (direction * (hPadding + (dims.width - element.offsetWidth)/2));
+                        const newY = currentY + dims.height / 2;
+
+                        if (isFinite(newX) && isFinite(newY)) {
+                            timeline.to(node, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(node) }, "<");
+                            const children = childrenMap.get(nodeId) || [];
+                            positionBranch(children, newX, newY, direction);
+                        } else {
+                            console.error(`Invalid position calculated in Organic Layout for node ${node.id}:`, {newX, newY});
+                        }
+                        currentY += dims.height + vPadding;
+                    });
+                };
+
+                // --- Root positioning ---
+                let totalRootHeight = 0;
+                const rootVSpacing = 100;
+                rootNodes.forEach(root => totalRootHeight += branchDimensions.get(root.id).height);
+                totalRootHeight += (rootNodes.length - 1) * rootVSpacing;
+                let currentRootY = -totalRootHeight / 2;
+
+                rootNodes.forEach((root) => {
+                    const rootNode = this.getNodeById(root.id);
+                    const dims = branchDimensions.get(root.id);
+                    const newX = 0;
+                    const newY = currentRootY + dims.height / 2;
+                    timeline.to(rootNode, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(rootNode) }, "<");
+                    
+                    const children = childrenMap.get(root.id) || [];
+                    const rightBranch = children.slice(0, Math.ceil(children.length / 2));
+                    const leftBranch = children.slice(Math.ceil(children.length / 2));
+                    
+                    positionBranch(rightBranch, newX, newY, 1);
+                    positionBranch(leftBranch, newX, newY, -1);
+
+                    currentRootY += dims.height + rootVSpacing;
+                });
             }
 
 
@@ -2158,6 +2674,15 @@
                              localStorage.removeItem('mindMapData'); return false;
                          }
 
+                         // Data Repair Step
+                        data.nodes.forEach(node => {
+                            if (!isFinite(node.x) || !isFinite(node.y)) {
+                                console.warn(`Node ${node.id} ('${node.title}') has invalid coordinates in localStorage. Resetting to origin.`, {x: node.x, y: node.y});
+                                node.x = 0;
+                                node.y = 0;
+                            }
+                        });
+
                          this.clearMap(); // Clear before loading
 
                          this.nodes = data.nodes;
@@ -2226,6 +2751,112 @@
                  // Don't reset view or theme here, allow keeping them
             }
 
+            openJsonModal() {
+                try {
+                    // Generate the current map data as a string
+                    this.nodes.forEach(n => {
+                       n.parentId = this.getParentId(n.id);
+                    });
+                    const data = {
+                        nodes: this.nodes,
+                        connections: this.connections,
+                        nextId: this.nextId,
+                        view: { offset: this.offset, scale: this.scale },
+                        theme: this.currentTheme
+                    };
+                    this.jsonExportArea.value = JSON.stringify(data, null, 2);
+                    this.jsonImportArea.value = ''; // Clear import area
+                    this.jsonModal.classList.add('active');
+                    this.jsonExportArea.scrollTop = 0; // Scroll to top
+                } catch (error) {
+                    console.error('Error preparing JSON for export:', error);
+                    this.showToast('Could not generate JSON data.', true);
+                }
+            }
+
+            closeJsonModal() {
+                this.jsonModal.classList.remove('active');
+            }
+
+            loadFromJSON(jsonString) {
+                try {
+                    const data = JSON.parse(jsonString);
+                    if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.connections) || typeof data.nextId !== 'number') {
+                        throw new Error("Invalid mind map file format.");
+                    }
+
+                    // Data Repair Step
+                    data.nodes.forEach(node => {
+                        if (!isFinite(node.x) || !isFinite(node.y)) {
+                            console.warn(`Node ${node.id} ('${node.title}') has invalid coordinates. Resetting to origin.`, {x: node.x, y: node.y});
+                            node.x = 0;
+                            node.y = 0;
+                        }
+                    });
+                    
+                    this.clearMap(); // Clear current state
+
+                    // Load data
+                    this.nodes = data.nodes;
+                    this.connections = data.connections;
+                    this.nextId = data.nextId;
+                    this.currentTheme = data.theme === 'dark' ? 'dark' : 'light';
+                    applyTheme(this.currentTheme);
+
+                    if (data.view && data.view.offset && typeof data.view.scale === 'number') {
+                        this.offset = data.view.offset;
+                        this.scale = data.view.scale;
+                    } else { this.offset = { x: 0, y: 0 }; this.scale = 1; }
+
+                    // Data Validation
+                    const defaultNodeColor = getComputedStyle(this.htmlEl).getPropertyValue('--node-bg-color').trim() || '#ffffff';
+                    const nodeIds = new Set(this.nodes.map(n => n.id));
+                    this.nodes.forEach(node => {
+                        node.color = node.color || defaultNodeColor;
+                        node.shape = node.shape || 'rounded-rectangle';
+                        node.parentId = node.parentId !== undefined ? node.parentId : null;
+                        node.x = typeof node.x === 'number' ? node.x : 0;
+                        node.y = typeof node.y === 'number' ? node.y : 0;
+                        if (node.parentId !== null && !nodeIds.has(node.parentId)) {
+                            node.parentId = null;
+                        }
+                    });
+
+                    this.connections = this.connections.filter(conn => nodeIds.has(conn.from) && nodeIds.has(conn.to));
+                    this.nodes.forEach(node => {
+                        const actualParentId = this.connections.find(c => c.to === node.id)?.from ?? null;
+                        node.parentId = actualParentId;
+                    });
+
+                    // Rebuild DOM
+                    this.nodes.forEach(nodeData => {
+                       const nodeElement = document.createElement('div');
+                       nodeElement.className = 'node';
+                       nodeElement.dataset.id = nodeData.id;
+                       this.updateNodeElementContent(nodeElement, nodeData);
+                       this.canvas.appendChild(nodeElement);
+                       this.applyNodeStyle(nodeData, nodeElement);
+                       this.updateNodeElementPosition(nodeData, nodeElement);
+                    });
+
+                    // Finalize UI
+                    this.buildRootNodeMap();
+                    this.updateCanvasTransform();
+                    this.updateConnections();
+                    this.updateStructureTree();
+                    requestAnimationFrame(() => this.centerView());
+
+                    this.showToast('Mind map loaded from text!');
+                    this.saveToLocalStorage();
+                    this.closeJsonModal();
+
+                } catch (error) {
+                    console.error('Error loading mind map from JSON:', error);
+                    this.showToast(`Error loading from text: ${error.message}`, true);
+                }
+            }
+
+
             // --- UI Feedback ---
             showToast(message, isError = false) {
                 const existingToast = document.querySelector('.toast-notification');
@@ -2284,8 +2915,8 @@
              // --- Fullscreen Toggle ---
              toggleFullscreen() {
                 if (!document.fullscreenElement) {
-                    this.htmlEl.requestFullscreen()
-                        .then(() => console.log("Entered fullscreen"))
+                    this.canvasContainer.requestFullscreen()
+                        .then(() => console.log("Entered canvas fullscreen"))
                         .catch(err => console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`));
                 } else {
                     if (document.exitFullscreen) {
@@ -2298,21 +2929,28 @@
 
              handleFullscreenChange() {
                 this.isFullscreen = !!document.fullscreenElement;
-                this.updateFullscreenIcon();
+                document.body.classList.toggle('canvas-fullscreen-active', this.isFullscreen);
+                this.updateFullscreenIcon(); // Updates header button
+                if (this.exitFullscreenBtn) {
+                    this.exitFullscreenBtn.style.display = this.isFullscreen ? 'flex' : 'none';
+                }
                 console.log(`Fullscreen state changed: ${this.isFullscreen}`);
-                // Optional: Recenter view slightly after fullscreen change?
-                // requestAnimationFrame(() => this.centerView());
+                // Recenter view after fullscreen change to adjust for new dimensions
+                requestAnimationFrame(() => this.centerView());
              }
 
              updateFullscreenIcon() {
                  const icon = this.fullscreenToggleBtn?.querySelector('i');
+                 const span = this.fullscreenToggleBtn?.querySelector('span');
                  if (!icon) return;
                  if (this.isFullscreen) {
                      icon.className = 'fas fa-compress'; // Show compress icon when fullscreen
-                     this.fullscreenToggleBtn.setAttribute('data-tooltip', 'Exit Fullscreen');
+                     this.fullscreenToggleBtn.title = 'Exit Fullscreen';
+                     if (span) span.textContent = 'Exit';
                  } else {
                      icon.className = 'fas fa-expand'; // Show expand icon when not fullscreen
-                     this.fullscreenToggleBtn.setAttribute('data-tooltip', 'Enter Fullscreen');
+                     this.fullscreenToggleBtn.title = 'Enter Fullscreen';
+                     if (span) span.textContent = 'Fullscreen';
                  }
              }
 
