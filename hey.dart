@@ -38,6 +38,7 @@ class StudyItem {
   final DateTime updatedAt;
   final String? imagePath; // New: For note images
   final String? audioPath; // New: For note audio
+  final String? difficulty; // New: For flashcard difficulty
 
   StudyItem({
     String? id,
@@ -49,6 +50,7 @@ class StudyItem {
     DateTime? updatedAt,
     this.imagePath,
     this.audioPath,
+    this.difficulty,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt ?? DateTime.now();
@@ -60,6 +62,8 @@ class StudyItem {
     StudyItemType? type,
     String? imagePath,
     String? audioPath,
+    String? difficulty,
+    bool? clearDifficulty,
   }) {
     return StudyItem(
       id: id,
@@ -71,6 +75,7 @@ class StudyItem {
       updatedAt: DateTime.now(),
       imagePath: imagePath ?? this.imagePath,
       audioPath: audioPath ?? this.audioPath,
+      difficulty: (clearDifficulty == true) ? null : difficulty ?? this.difficulty,
     );
   }
 
@@ -85,6 +90,7 @@ class StudyItem {
       'updatedAt': updatedAt.toIso8601String(),
       'imagePath': imagePath,
       'audioPath': audioPath,
+      'difficulty': difficulty,
     };
   }
 
@@ -102,6 +108,7 @@ class StudyItem {
       updatedAt: DateTime.parse(map['updatedAt']),
       imagePath: map['imagePath'],
       audioPath: map['audioPath'],
+      difficulty: map['difficulty'],
     );
   }
 
@@ -613,6 +620,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ).then((_) => _loadItems());
       },
+      onLongPress: () {
+        _showRenameCategoryDialog(category);
+      },
       child: Stack(
         children: [
           Transform.translate(
@@ -687,6 +697,54 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
   }
+
+  void _showRenameCategoryDialog(String oldCategory) {
+    final TextEditingController controller = TextEditingController(text: oldCategory);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Rename Category', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: Colors.white),
+          decoration: const InputDecoration(
+            hintText: 'Enter new category name',
+            hintStyle: TextStyle(color: Colors.white54),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newCategory = controller.text.trim();
+              if (newCategory.isNotEmpty && newCategory != oldCategory) {
+                final updatedItems = _items.map((item) {
+                  if (item.category == oldCategory) {
+                    return item.copyWith(category: newCategory);
+                  }
+                  return item;
+                }).toList();
+                
+                StorageService.saveItems(updatedItems).then((_) {
+                  _loadItems();
+                  Navigator.pop(context);
+                });
+              } else {
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+            child: const Text('Save', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 
@@ -717,6 +775,8 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
 
   bool _isDragOverAnswer = false;
   bool _isDragOverContent = false;
+  bool _bulletPointMode = false;
+  TextEditingValue _previousContentValue = TextEditingValue.empty;
 
   final ImagePicker _picker = ImagePicker();
   final AudioRecorder _audioRecorder = AudioRecorder();
@@ -731,10 +791,12 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
     if (widget.initialCategory != null) {
       _categoryController.text = widget.initialCategory!;
     }
+    _contentController.addListener(_handleBulletPoints);
   }
 
   @override
   void dispose() {
+    _contentController.removeListener(_handleBulletPoints);
     _tabController.dispose();
     _categoryController.dispose();
     _questionController.dispose();
@@ -743,6 +805,42 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
     _contentController.dispose();
     _audioRecorder.dispose();
     super.dispose();
+  }
+
+  void _handleBulletPoints() {
+    if (!_bulletPointMode) return;
+
+    final text = _contentController.text;
+    final oldValue = _previousContentValue;
+    final newValue = _contentController.value;
+
+    if (newValue.text.length > oldValue.text.length) {
+      final newChar = newValue.text[oldValue.selection.start];
+      if (newChar == '\n') {
+        final currentLineStart = newValue.selection.baseOffset;
+        final textToInsert = '• ';
+        final newText = text.substring(0, currentLineStart) + textToInsert + text.substring(currentLineStart);
+        _contentController.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: currentLineStart + textToInsert.length),
+        );
+      }
+    }
+    _previousContentValue = _contentController.value;
+  }
+
+  void _updateContentWithBullets(String text) {
+    setState(() {
+      if (_bulletPointMode) {
+        final currentText = _contentController.text;
+        if (currentText.isNotEmpty && !currentText.endsWith('\n')) {
+          _contentController.text += '\n';
+        }
+        _contentController.text += '• ' + text.replaceAll('\n', '\n• ');
+      } else {
+        _contentController.text += text;
+      }
+    });
   }
 
   Future<void> _pickImage() async {
@@ -968,71 +1066,58 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
           const SizedBox(height: 16),
           _buildTextField(_titleController, 'Title', Icons.title),
           const SizedBox(height: 16),
-          DropRegion(
-            formats: const [Formats.plainText, Formats.uri, Formats.htmlText],
-            hitTestBehavior: HitTestBehavior.opaque,
-            onDropOver: (event) {
-              if (event.session.allowedOperations.contains(DropOperation.copy)) {
-                return DropOperation.copy;
-              }
-              return DropOperation.none;
-            },
-            onDropEnter: (event) => setState(() => _isDragOverContent = true),
-            onDropLeave: (event) => setState(() => _isDragOverContent = false),
-            onPerformDrop: (event) async {
-              print('onPerformDrop called in _buildNoteForm!');
-              setState(() => _isDragOverContent = false);
-              final item = event.session.items.first;
+          Row(
+            children: [
+              Expanded(
+                child: DropRegion(
+                  formats: const [Formats.plainText, Formats.uri, Formats.htmlText],
+                  hitTestBehavior: HitTestBehavior.opaque,
+                  onDropOver: (event) {
+                    if (event.session.allowedOperations.contains(DropOperation.copy)) {
+                      return DropOperation.copy;
+                    }
+                    return DropOperation.none;
+                  },
+                  onDropEnter: (event) => setState(() => _isDragOverContent = true),
+                  onDropLeave: (event) => setState(() => _isDragOverContent = false),
+                  onPerformDrop: (event) async {
+                    setState(() => _isDragOverContent = false);
+                    final item = event.session.items.first;
+                    final reader = item.dataReader!;
 
-              final reader = item.dataReader!;
-
-              print('Checking for plainText...');
-              if (item.canProvide(Formats.plainText)) {
-                print('Can provide plainText. Getting value...');
-                reader.getValue<String>(Formats.plainText, (text) {
-                  print('Received plainText value: ${text?.substring(0, min(text.length, 50))}...');
-                  if (text != null) {
-                    setState(() {
-                      _contentController.text += text;
-                    });
-                  }
-                }, onError: (error) {
-                  print('Error reading plain text value: $error');
-                });
-              }
-
-              print('Checking for uri...');
-              if (item.canProvide(Formats.uri)) {
-                print('Can provide uri. Getting value...');
-                reader.getValue<NamedUri>(Formats.uri, (namedUri) {
-                  print('Received uri value: ${namedUri?.uri}');
-                  if (namedUri != null) {
-                    setState(() {
-                      _contentController.text += namedUri.uri.toString();
-                    });
-                  }
-                }, onError: (error) {
-                  print('Error reading uri value: $error');
-                });
-              }
-
-              print('Checking for htmlText...');
-              if (item.canProvide(Formats.htmlText)) {
-                print('Can provide htmlText. Getting value...');
-                reader.getValue<String>(Formats.htmlText, (html) {
-                  print('Received htmlText value: ${html?.substring(0, min(html.length, 50))}...');
-                  if (html != null) {
-                    setState(() {
-                      _contentController.text += html;
-                    });
-                  }
-                }, onError: (error) {
-                  print('Error reading html value: $error');
-                });
-              }
-              print('onPerformDrop in _buildNoteForm finished.');
-            },
-            child: _buildTextField(_contentController, 'Content (Drop text here)', Icons.note, maxLines: 5, isDragOver: _isDragOverContent),
+                    if (item.canProvide(Formats.plainText)) {
+                      reader.getValue<String>(Formats.plainText, (text) {
+                        if (text != null) {
+                          _updateContentWithBullets(text);
+                        }
+                      });
+                    } else if (item.canProvide(Formats.uri)) {
+                      reader.getValue<NamedUri>(Formats.uri, (uri) {
+                        if (uri != null) {
+                          _updateContentWithBullets(uri.uri.toString());
+                        }
+                      });
+                    }
+                  },
+                  child: _buildTextField(_contentController, 'Content (Drop text here)', Icons.note, maxLines: 5, isDragOver: _isDragOverContent),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(
+                  Icons.format_list_bulleted,
+                  color: _bulletPointMode ? AppTheme.primaryColor : Colors.white54,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _bulletPointMode = !_bulletPointMode;
+                    if (_bulletPointMode && _contentController.text.isEmpty) {
+                      _contentController.text = '• ';
+                    }
+                  });
+                },
+              ),
+            ],
           ),
           const SizedBox(height: 24),
 
@@ -1461,6 +1546,7 @@ class _FlashcardWidgetState extends State<FlashcardWidget> with SingleTickerProv
           Transform.translate(offset: const Offset(4, 4), child: Container(decoration: solidDecoration)),
           GestureDetector(
             onTap: _handleTap,
+            onLongPress: isNote ? null : () => _showDifficultyMenu(context),
             child: isNote
                 ? _buildFront(glassDecoration) // Notes don't flip
                 : AnimatedBuilder(
@@ -1483,46 +1569,97 @@ class _FlashcardWidgetState extends State<FlashcardWidget> with SingleTickerProv
     );
   }
 
+  void _showDifficultyMenu(BuildContext context) {
+    final RenderBox renderBox = context.findRenderObject() as RenderBox;
+    final position = renderBox.localToGlobal(Offset.zero);
+
+    showMenu(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + renderBox.size.width, position.dy + renderBox.size.height),
+      items: [
+        const PopupMenuItem(
+          value: 'easy',
+          child: Text('Easy'),
+        ),
+        const PopupMenuItem(
+          value: 'hard',
+          child: Text('Hard'),
+        ),
+        const PopupMenuItem(
+          value: 'none',
+          child: Text('Clear'),
+        ),
+      ],
+    ).then((value) {
+      if (value == 'none') {
+        widget.onEdit(widget.item.copyWith(clearDifficulty: true));
+      } else if (value != null) {
+        widget.onEdit(widget.item.copyWith(difficulty: value));
+      }
+    });
+  }
+
   Widget _buildFront(BoxDecoration decoration) {
     final isNote = widget.item.type == StudyItemType.note;
+    
+    Color? overlayColor;
+    if (widget.item.difficulty == 'easy') {
+      overlayColor = Colors.green.withOpacity(0.3);
+    } else if (widget.item.difficulty == 'hard') {
+      overlayColor = Colors.red.withOpacity(0.3);
+    }
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: decoration,
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Icon(isNote ? Icons.note_alt_outlined : Icons.help_outline, color: Colors.white.withOpacity(0.8), size: 28),
-                  Row(
-                    children: [
-                      IconButton(onPressed: () => _showEditDialog(), icon: const Icon(Icons.edit, color: Colors.white70, size: 20)),
-                      IconButton(onPressed: () => _showDeleteDialog(), icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20)),
-                    ],
-                  ),
-                ],
-              ),
-              Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    child: Text(
-                      widget.item.question,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18),
-                      textAlign: TextAlign.center,
+              Padding(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Icon(isNote ? Icons.note_alt_outlined : Icons.help_outline, color: Colors.white.withOpacity(0.8), size: 28),
+                        Row(
+                          children: [
+                            IconButton(onPressed: () => _showEditDialog(), icon: const Icon(Icons.edit, color: Colors.white70, size: 20)),
+                            IconButton(onPressed: () => _showDeleteDialog(), icon: const Icon(Icons.delete, color: Colors.redAccent, size: 20)),
+                          ],
+                        ),
+                      ],
                     ),
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          child: Text(
+                            widget.item.question,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Text(isNote ? 'Tap to open' : 'Tap to flip',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (overlayColor != null)
+                Container(
+                  decoration: BoxDecoration(
+                    color: overlayColor,
+                    borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-              ),
-              Center(
-                child: Text(isNote ? 'Tap to open' : 'Tap to flip',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
-                ),
-              ),
             ],
           ),
         ),
@@ -1676,9 +1813,20 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.noteSecondaryColor),
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    widget.note.answer,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5, fontSize: 18),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      widget.note.answer,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        height: 1.5,
+                        fontSize: 18,
+                        color: Colors.black87,
+                      ),
+                    ),
                   ),
                 ]),
               ),
