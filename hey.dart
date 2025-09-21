@@ -14,6 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:super_drag_and_drop/super_drag_and_drop.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -714,6 +715,9 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
 
+  bool _isDragOverAnswer = false;
+  bool _isDragOverContent = false;
+
   final ImagePicker _picker = ImagePicker();
   final AudioRecorder _audioRecorder = AudioRecorder();
   File? _pickedImage;
@@ -868,13 +872,80 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
       child: Column(
         children: [
           _buildTextField(
-            _categoryController, 'Category', Icons.folder,
+            _categoryController,
+            'Category',
+            Icons.folder,
             isEnabled: widget.initialCategory == null,
           ),
           const SizedBox(height: 16),
           _buildTextField(_questionController, 'Question', Icons.help_outline, maxLines: 3),
           const SizedBox(height: 16),
-          _buildTextField(_answerController, 'Answer', Icons.lightbulb_outline, maxLines: 5),
+          DropRegion(
+            formats: const [Formats.plainText, Formats.uri, Formats.htmlText],
+            hitTestBehavior: HitTestBehavior.opaque,
+            onDropOver: (event) {
+              if (event.session.allowedOperations.contains(DropOperation.copy)) {
+                return DropOperation.copy;
+              }
+              return DropOperation.none;
+            },
+            onDropEnter: (event) => setState(() => _isDragOverAnswer = true),
+            onDropLeave: (event) => setState(() => _isDragOverAnswer = false),
+            onPerformDrop: (event) async {
+              print('onPerformDrop called in _buildFlashcardForm!');
+              setState(() => _isDragOverAnswer = false);
+              final item = event.session.items.first;
+
+              final reader = item.dataReader!;
+
+              print('Checking for plainText...');
+              if (item.canProvide(Formats.plainText)) {
+                print('Can provide plainText. Getting value...');
+                reader.getValue<String>(Formats.plainText, (text) {
+                  print('Received plainText value: ${text?.substring(0, min(text.length, 50))}...');
+                  if (text != null) {
+                    setState(() {
+                      _answerController.text += text;
+                    });
+                  }
+                }, onError: (error) {
+                  print('Error reading plain text value: $error');
+                });
+              }
+
+              print('Checking for uri...');
+              if (item.canProvide(Formats.uri)) {
+                print('Can provide uri. Getting value...');
+                reader.getValue<NamedUri>(Formats.uri, (namedUri) {
+                  print('Received uri value: ${namedUri?.uri}');
+                  if (namedUri != null) {
+                    setState(() {
+                      _answerController.text += namedUri.uri.toString();
+                    });
+                  }
+                }, onError: (error) {
+                  print('Error reading uri value: $error');
+                });
+              }
+
+              print('Checking for htmlText...');
+              if (item.canProvide(Formats.htmlText)) {
+                print('Can provide htmlText. Getting value...');
+                reader.getValue<String>(Formats.htmlText, (html) {
+                  print('Received htmlText value: ${html?.substring(0, min(html.length, 50))}...');
+                  if (html != null) {
+                    setState(() {
+                      _answerController.text += html;
+                    });
+                  }
+                }, onError: (error) {
+                  print('Error reading html value: $error');
+                });
+              }
+              print('onPerformDrop in _buildFlashcardForm finished.');
+            },
+            child: _buildTextField(_answerController, 'Answer (Drop text here)', Icons.lightbulb_outline, maxLines: 5, isDragOver: _isDragOverAnswer),
+          ),
           const SizedBox(height: 24),
           _buildActionButton('Create Card', Icons.add, () => _createFlashcard()),
         ],
@@ -889,13 +960,80 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildTextField(
-            _categoryController, 'Category', Icons.folder,
+            _categoryController,
+            'Category',
+            Icons.folder,
             isEnabled: widget.initialCategory == null,
           ),
           const SizedBox(height: 16),
           _buildTextField(_titleController, 'Title', Icons.title),
           const SizedBox(height: 16),
-          _buildTextField(_contentController, 'Content', Icons.note, maxLines: 5),
+          DropRegion(
+            formats: const [Formats.plainText, Formats.uri, Formats.htmlText],
+            hitTestBehavior: HitTestBehavior.opaque,
+            onDropOver: (event) {
+              if (event.session.allowedOperations.contains(DropOperation.copy)) {
+                return DropOperation.copy;
+              }
+              return DropOperation.none;
+            },
+            onDropEnter: (event) => setState(() => _isDragOverContent = true),
+            onDropLeave: (event) => setState(() => _isDragOverContent = false),
+            onPerformDrop: (event) async {
+              print('onPerformDrop called in _buildNoteForm!');
+              setState(() => _isDragOverContent = false);
+              final item = event.session.items.first;
+
+              final reader = item.dataReader!;
+
+              print('Checking for plainText...');
+              if (item.canProvide(Formats.plainText)) {
+                print('Can provide plainText. Getting value...');
+                reader.getValue<String>(Formats.plainText, (text) {
+                  print('Received plainText value: ${text?.substring(0, min(text.length, 50))}...');
+                  if (text != null) {
+                    setState(() {
+                      _contentController.text += text;
+                    });
+                  }
+                }, onError: (error) {
+                  print('Error reading plain text value: $error');
+                });
+              }
+
+              print('Checking for uri...');
+              if (item.canProvide(Formats.uri)) {
+                print('Can provide uri. Getting value...');
+                reader.getValue<NamedUri>(Formats.uri, (namedUri) {
+                  print('Received uri value: ${namedUri?.uri}');
+                  if (namedUri != null) {
+                    setState(() {
+                      _contentController.text += namedUri.uri.toString();
+                    });
+                  }
+                }, onError: (error) {
+                  print('Error reading uri value: $error');
+                });
+              }
+
+              print('Checking for htmlText...');
+              if (item.canProvide(Formats.htmlText)) {
+                print('Can provide htmlText. Getting value...');
+                reader.getValue<String>(Formats.htmlText, (html) {
+                  print('Received htmlText value: ${html?.substring(0, min(html.length, 50))}...');
+                  if (html != null) {
+                    setState(() {
+                      _contentController.text += html;
+                    });
+                  }
+                }, onError: (error) {
+                  print('Error reading html value: $error');
+                });
+              }
+              print('onPerformDrop in _buildNoteForm finished.');
+            },
+            child: _buildTextField(_contentController, 'Content (Drop text here)', Icons.note, maxLines: 5, isDragOver: _isDragOverContent),
+          ),
           const SizedBox(height: 24),
 
           if (_pickedImage != null)
@@ -1044,7 +1182,7 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
   }
 
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool isEnabled = true}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool isEnabled = true, bool isDragOver = false}) {
     return TextField(
       controller: controller, maxLines: maxLines, enabled: isEnabled,
       style: TextStyle(color: isEnabled ? Colors.white : Colors.white54),
@@ -1052,7 +1190,7 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
         labelText: label, labelStyle: const TextStyle(color: Colors.white70),
         prefixIcon: Icon(icon, color: AppTheme.primaryColor),
         filled: true, fillColor: Colors.black.withOpacity(0.2),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.3))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDragOver ? AppTheme.primaryColor : Colors.white.withOpacity(0.3))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryColor)),
         disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.1))),
       ),
@@ -1568,6 +1706,7 @@ class _EditCardDialogState extends State<EditCardDialog> {
   late TextEditingController categoryController;
   late TextEditingController questionController;
   late TextEditingController answerController;
+  bool _isDragOver = false;
 
   @override
   void initState() {
@@ -1610,7 +1749,72 @@ class _EditCardDialogState extends State<EditCardDialog> {
                     const SizedBox(height: 16),
                     _buildTextField(questionController, widget.item.type == StudyItemType.note ? 'Title' : 'Question', Icons.help_outline, maxLines: 3),
                     const SizedBox(height: 16),
-                    _buildTextField(answerController, widget.item.type == StudyItemType.note ? 'Content' : 'Answer', Icons.lightbulb_outline, maxLines: 5),
+                    DropRegion(
+                      formats: const [Formats.plainText, Formats.uri, Formats.htmlText],
+                      hitTestBehavior: HitTestBehavior.opaque,
+                      onDropOver: (event) {
+                        if (event.session.allowedOperations.contains(DropOperation.copy)) {
+                          return DropOperation.copy;
+                        }
+                        return DropOperation.none;
+                      },
+                      onDropEnter: (event) => setState(() => _isDragOver = true),
+                      onDropLeave: (event) => setState(() => _isDragOver = false),
+                      onPerformDrop: (event) async {
+                        print('onPerformDrop called in EditCardDialog!');
+                        setState(() => _isDragOver = false);
+                        final item = event.session.items.first;
+
+                        final reader = item.dataReader!;
+
+                        print('Checking for plainText...');
+                        if (item.canProvide(Formats.plainText)) {
+                          print('Can provide plainText. Getting value...');
+                          reader.getValue<String>(Formats.plainText, (text) {
+                            print('Received plainText value: ${text?.substring(0, min(text.length, 50))}...');
+                            if (text != null) {
+                              setState(() {
+                                answerController.text += text;
+                              });
+                            }
+                          }, onError: (error) {
+                            print('Error reading plain text value: $error');
+                          });
+                        }
+
+                        print('Checking for uri...');
+                        if (item.canProvide(Formats.uri)) {
+                          print('Can provide uri. Getting value...');
+                          reader.getValue<NamedUri>(Formats.uri, (namedUri) {
+                            print('Received uri value: ${namedUri?.uri}');
+                            if (namedUri != null) {
+                              setState(() {
+                                answerController.text += namedUri.uri.toString();
+                              });
+                            }
+                          }, onError: (error) {
+                            print('Error reading uri value: $error');
+                          });
+                        }
+
+                        print('Checking for htmlText...');
+                        if (item.canProvide(Formats.htmlText)) {
+                          print('Can provide htmlText. Getting value...');
+                          reader.getValue<String>(Formats.htmlText, (html) {
+                            print('Received htmlText value: ${html?.substring(0, min(html.length, 50))}...');
+                            if (html != null) {
+                              setState(() {
+                                answerController.text += html;
+                              });
+                            }
+                          }, onError: (error) {
+                            print('Error reading html value: $error');
+                          });
+                        }
+                        print('onPerformDrop in EditCardDialog finished.');
+                      },
+                      child: _buildTextField(answerController, widget.item.type == StudyItemType.note ? 'Content (Drop text here)' : 'Answer (Drop text here)', Icons.lightbulb_outline, maxLines: 5, isDragOver: _isDragOver),
+                    ),
                     const SizedBox(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -1642,11 +1846,11 @@ class _EditCardDialogState extends State<EditCardDialog> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1}) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {int maxLines = 1, bool isDragOver = false}) {
     return TextField(controller: controller, maxLines: maxLines, style: const TextStyle(color: Colors.white), decoration: InputDecoration(
         labelText: label, labelStyle: const TextStyle(color: Colors.white70),
         prefixIcon: Icon(icon, color: AppTheme.primaryColor), filled: true, fillColor: Colors.black.withOpacity(0.2),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white.withOpacity(0.3))),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: isDragOver ? AppTheme.primaryColor : Colors.white.withOpacity(0.3))),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryColor))),
     );
   }
@@ -1931,4 +2135,4 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
       ),
     );
   }
-} 
+}
