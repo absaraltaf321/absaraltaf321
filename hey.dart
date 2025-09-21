@@ -15,6 +15,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:super_drag_and_drop/super_drag_and_drop.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,387 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
   runApp(const FlashcardApp());
+}
+
+// New: Cramming Screen for non-SRS practice
+class CramScreen extends StatefulWidget {
+  final List<StudyItem> items;
+
+  const CramScreen({super.key, required this.items});
+
+  @override
+  State<CramScreen> createState() => _CramScreenState();
+}
+
+class _CramScreenState extends State<CramScreen> with TickerProviderStateMixin {
+  late List<StudyItem> _cards;
+  int _currentIndex = 0;
+  bool _isFlipped = false;
+  late AnimationController _flipController;
+  late AnimationController _dragController;
+  late Animation<Offset> _cardOffset;
+  Offset _dragPosition = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _cards = List.from(widget.items)..shuffle();
+    _flipController = AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
+    _dragController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+    _cardOffset = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(CurvedAnimation(parent: _dragController, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _flipController.dispose();
+    _dragController.dispose();
+    super.dispose();
+  }
+
+  void _flipCard() {
+    if (_flipController.isAnimating) return;
+    setState(() => _isFlipped = !_isFlipped);
+    if (_isFlipped) {
+      _flipController.forward();
+    } else {
+      _flipController.reverse();
+    }
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    setState(() {
+      _dragPosition += details.delta;
+    });
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    if (_dragPosition.dx.abs() > screenWidth * 0.4 || details.velocity.pixelsPerSecond.dx.abs() > 500) {
+      final endOffset = _dragPosition.dx > 0
+          ? Offset(screenWidth * 1.2, _dragPosition.dy)
+          : Offset(-screenWidth * 1.2, _dragPosition.dy);
+
+      _cardOffset = Tween<Offset>(begin: _dragPosition, end: endOffset)
+          .animate(CurvedAnimation(parent: _dragController, curve: Curves.easeIn));
+      _dragController.forward().then((_) => _nextCard());
+    } else {
+      _cardOffset = Tween<Offset>(begin: _dragPosition, end: Offset.zero)
+          .animate(CurvedAnimation(parent: _dragController, curve: Curves.easeOut));
+      _dragController.forward(from: 0).whenComplete(() {
+        if (mounted) setState(() => _dragPosition = Offset.zero);
+      });
+    }
+  }
+
+  void _nextCard() {
+    if (_currentIndex < _cards.length - 1) {
+      setState(() {
+        _currentIndex++;
+        _isFlipped = false;
+        _dragPosition = Offset.zero;
+        _flipController.reset();
+        _dragController.reset();
+        _cardOffset = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(_dragController);
+      });
+    } else {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You've finished this cram session!")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppTheme.backgroundColor, Color(0xFF1A1A2E)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildAppBar(),
+              _buildProgress(),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: GestureDetector(
+                    onTap: _flipCard,
+                    onPanUpdate: _onPanUpdate,
+                    onPanEnd: _onPanEnd,
+                    child: AnimatedBuilder(
+                      animation: Listenable.merge([_dragController, _flipController]),
+                      builder: (context, child) {
+                        final cardPosition = _dragController.isAnimating
+                            ? _cardOffset.value
+                            : _dragPosition;
+                        final angle = cardPosition.dx / MediaQuery.of(context).size.width * 0.4;
+
+                        return Transform.translate(
+                          offset: cardPosition,
+                          child: Transform.rotate(
+                            angle: angle,
+                            child: _buildCardStack(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              _buildControls(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCardStack() {
+    return AspectRatio(
+      aspectRatio: 16 / 10,
+      child: Stack(
+        children: [
+          Transform.translate(
+            offset: const Offset(4, 4),
+            child: Container(decoration: AppTheme.solidPracticeCardDecoration),
+          ),
+          AnimatedBuilder(
+            animation: _flipController,
+            builder: (context, child) {
+              final isFront = _flipController.value < 0.5;
+              final transform = Matrix4.identity()
+                ..setEntry(3, 2, 0.001)
+                ..rotateY(_flipController.value * pi);
+
+              return Transform(
+                transform: transform,
+                alignment: Alignment.center,
+                child: isFront
+                    ? _buildPracticeCardFace(isFront: true)
+                    : Transform(
+                  transform: Matrix4.identity()..rotateY(pi),
+                  alignment: Alignment.center,
+                  child: _buildPracticeCardFace(isFront: false),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPracticeCardFace({required bool isFront}) {
+    final item = _cards[_currentIndex];
+    final textContent = isFront ? item.question : item.answer;
+    final decoration = isFront ? AppTheme.glassPracticeCardDecoration : AppTheme.solidPracticeCardDecoration;
+
+    Widget cardFace = Container(
+      decoration: decoration,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Center(
+          child: SingleChildScrollView(
+            child: MarkdownBody(
+              data: textContent,
+              styleSheet: isFront
+                  ? MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                p: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 22),
+                textAlign: WrapAlignment.center,
+              )
+                  : MarkdownStyleSheet(
+                p: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 22, color: Colors.white),
+                h1: const TextStyle(fontSize: 28, color: Colors.white, fontWeight: FontWeight.bold),
+                h2: const TextStyle(fontSize: 26, color: Colors.white, fontWeight: FontWeight.bold),
+                h3: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold),
+                code: TextStyle(backgroundColor: Colors.black.withOpacity(0.2), fontFamily: 'monospace', color: Colors.white),
+                a: const TextStyle(color: AppTheme.secondaryColor, decoration: TextDecoration.underline),
+                textAlign: WrapAlignment.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return isFront ? ClipRRect(borderRadius: BorderRadius.circular(20), child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), child: cardFace)) : cardFace;
+  }
+
+  Widget _buildAppBar() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          Text("Practice Session", style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(width: 48),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgress() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+      child: Column(
+        children: [
+          LinearProgressIndicator(
+            value: (_currentIndex + 1) / _cards.length,
+            backgroundColor: AppTheme.cardColor,
+            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+          ),
+          const SizedBox(height: 8),
+          Text('${_currentIndex + 1} / ${_cards.length}', style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControls() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          ElevatedButton(
+            onPressed: _flipCard,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.secondaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("Flip", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class StatisticsScreen extends StatelessWidget {
+  final List<StudyItem> items;
+
+  const StatisticsScreen({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    // --- Calculations ---
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final nextWeek = today.add(const Duration(days: 7));
+
+    final allCards = items.where((i) => i.type == StudyItemType.card).toList();
+    final dueToday = allCards.where((c) {
+      final d = c.dueDate;
+      final dueDate = DateTime(d.year, d.month, d.day);
+      return dueDate.isAtSameMomentAs(today) || dueDate.isBefore(today);
+    }).length;
+
+    final dueTomorrow = allCards.where((c) {
+      final d = c.dueDate;
+      final dueDate = DateTime(d.year, d.month, d.day);
+      return dueDate.isAtSameMomentAs(tomorrow);
+    }).length;
+
+    final dueNextWeek = allCards.where((c) {
+      final d = c.dueDate;
+      final dueDate = DateTime(d.year, d.month, d.day);
+      return dueDate.isAfter(today) && (dueDate.isBefore(nextWeek) || dueDate.isAtSameMomentAs(nextWeek));
+    }).length;
+
+    final newCards = allCards.where((c) => c.interval == 0).length;
+    final youngCards = allCards.where((c) => c.interval > 0 && c.interval < 21).length;
+    final matureCards = allCards.where((c) => c.interval >= 21).length;
+
+    // --- UI ---
+    return Scaffold(
+      backgroundColor: AppTheme.backgroundColor,
+      appBar: AppBar(
+        title: const Text('Statistics', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: AppTheme.cardColor,
+        elevation: 0,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildStatCard(
+            context,
+            title: 'Collection Overview',
+            icon: Icons.inventory_2_outlined,
+            stats: {
+              'Total Items': items.length,
+              'Flashcards': allCards.length,
+              'Notes': items.length - allCards.length,
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildStatCard(
+            context,
+            title: 'Card Maturity',
+            icon: Icons.trending_up_outlined,
+            stats: {
+              'New Cards (learning)': newCards,
+              'Young Cards (< 3 weeks)': youngCards,
+              'Mature Cards (3+ weeks)': matureCards,
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildStatCard(
+            context,
+            title: 'Future Forecast',
+            icon: Icons.calendar_today_outlined,
+            stats: {
+              'Due Today': dueToday,
+              'Due Tomorrow': dueTomorrow,
+              'Due in Next 7 Days': dueNextWeek,
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(BuildContext context, {required String title, required IconData icon, required Map<String, int> stats}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppTheme.glassCardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppTheme.primaryColor, size: 24),
+              const SizedBox(width: 8),
+              Text(title, style: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          Divider(height: 24, color: Colors.white.withOpacity(0.2)),
+          ...stats.entries.map((entry) => Padding(
+            padding: const EdgeInsets.only(bottom: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(entry.key, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 16)),
+                Text(entry.value.toString(), style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
 }
 
 // Data Models
@@ -36,9 +418,13 @@ class StudyItem {
   final StudyItemType type;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final String? imagePath; // New: For note images
-  final String? audioPath; // New: For note audio
-  final String? difficulty; // New: For flashcard difficulty
+  final String? imagePath;
+  final String? audioPath;
+  final String? difficulty;
+  // SRS Fields
+  final DateTime dueDate;
+  final int interval;
+  final double easeFactor;
 
   StudyItem({
     String? id,
@@ -51,9 +437,15 @@ class StudyItem {
     this.imagePath,
     this.audioPath,
     this.difficulty,
+    DateTime? dueDate,
+    int? interval,
+    double? easeFactor,
   })  : id = id ?? const Uuid().v4(),
         createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+        updatedAt = updatedAt ?? DateTime.now(),
+        dueDate = dueDate ?? DateTime.now(),
+        interval = interval ?? 0,
+        easeFactor = easeFactor ?? 2.5;
 
   StudyItem copyWith({
     String? category,
@@ -64,6 +456,9 @@ class StudyItem {
     String? audioPath,
     String? difficulty,
     bool? clearDifficulty,
+    DateTime? dueDate,
+    int? interval,
+    double? easeFactor,
   }) {
     return StudyItem(
       id: id,
@@ -76,6 +471,9 @@ class StudyItem {
       imagePath: imagePath ?? this.imagePath,
       audioPath: audioPath ?? this.audioPath,
       difficulty: (clearDifficulty == true) ? null : difficulty ?? this.difficulty,
+      dueDate: dueDate ?? this.dueDate,
+      interval: interval ?? this.interval,
+      easeFactor: easeFactor ?? this.easeFactor,
     );
   }
 
@@ -91,6 +489,9 @@ class StudyItem {
       'imagePath': imagePath,
       'audioPath': audioPath,
       'difficulty': difficulty,
+      'dueDate': dueDate.toIso8601String(),
+      'interval': interval,
+      'easeFactor': easeFactor,
     };
   }
 
@@ -109,11 +510,62 @@ class StudyItem {
       imagePath: map['imagePath'],
       audioPath: map['audioPath'],
       difficulty: map['difficulty'],
+      dueDate: map['dueDate'] != null ? DateTime.parse(map['dueDate']) : DateTime.now(),
+      interval: map['interval'] ?? 0,
+      easeFactor: map['easeFactor']?.toDouble() ?? 2.5,
     );
   }
 
   String toJson() => json.encode(toMap());
   factory StudyItem.fromJson(String source) => StudyItem.fromMap(json.decode(source));
+}
+
+enum ReviewQuality { again, hard, good, easy }
+
+class SpacedRepetitionSystem {
+  static StudyItem schedule(StudyItem item, ReviewQuality quality) {
+    if (item.type != StudyItemType.card) return item;
+
+    double easeFactor = item.easeFactor;
+    int interval = item.interval;
+
+    if (quality == ReviewQuality.again) {
+      interval = 1; // Review tomorrow
+      easeFactor = max(1.3, easeFactor - 0.20);
+    } else {
+      // Adjust ease factor based on performance
+      if (quality == ReviewQuality.hard) {
+        easeFactor = max(1.3, easeFactor - 0.15);
+      } else if (quality == ReviewQuality.easy) {
+        easeFactor = easeFactor + 0.15;
+      }
+
+      if (interval == 0) { // First review of a new card
+        switch (quality) {
+          case ReviewQuality.hard: interval = 1; break;
+          case ReviewQuality.good: interval = 2; break;
+          case ReviewQuality.easy: interval = 4; break;
+          case ReviewQuality.again: break; // Already handled
+        }
+      } else { // Subsequent reviews
+        interval = (interval * easeFactor).ceil(); // Use ceil to ensure it grows
+      }
+    }
+
+    // Cap the interval to avoid excessively long waits
+    interval = min(interval, 365);
+
+    // Calculate the next due date, ignoring the time part
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final newDueDate = today.add(Duration(days: interval));
+
+    return item.copyWith(
+      easeFactor: easeFactor,
+      interval: interval,
+      dueDate: newDueDate,
+    );
+  }
 }
 
 // App Theme
@@ -463,6 +915,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<StudyItem> _items = [];
   late AnimationController _fadeController;
+  final _searchController = TextEditingController();
+  List<StudyItem> _searchResults = [];
+  int _dueCardCount = 0;
 
   @override
   void initState() {
@@ -472,11 +927,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       vsync: this,
     );
     _loadItems();
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
     _fadeController.dispose();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -486,7 +944,79 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       setState(() {
         _items = items;
       });
+      _calculateDueCards();
+      _onSearchChanged();
       _fadeController.forward(from: 0);
+    }
+  }
+
+  void _calculateDueCards() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final dueCards = _items.where((item) {
+      if (item.type != StudyItemType.card) return false;
+      final dueDate = item.dueDate;
+      final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+      return dueDay.isBefore(today) || dueDay.isAtSameMomentAs(today);
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _dueCardCount = dueCards.length;
+      });
+    }
+  }
+
+  void _startGlobalStudySession() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final dueCards = _items.where((item) {
+      if (item.type != StudyItemType.card) return false;
+      final dueDate = item.dueDate;
+      final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+      return dueDay.isBefore(today) || dueDay.isAtSameMomentAs(today);
+    }).toList();
+
+    if (dueCards.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StudySessionScreen(
+            items: dueCards,
+            onSessionComplete: (updatedItems) async {
+              final allItems = await StorageService.loadItems();
+              for (var updatedItem in updatedItems) {
+                final index = allItems.indexWhere((i) => i.id == updatedItem.id);
+                if (index != -1) {
+                  allItems[index] = updatedItem;
+                }
+              }
+              await StorageService.saveItems(allItems);
+              _loadItems();
+            },
+          ),
+        ),
+      );
+    }
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.trim();
+    if (mounted) {
+      setState(() {
+        if (query.isEmpty) {
+          _searchResults.clear();
+        } else {
+          _searchResults = _items.where((item) {
+            final lowerCaseQuery = query.toLowerCase();
+            return item.question.toLowerCase().contains(lowerCaseQuery) ||
+                item.answer.toLowerCase().contains(lowerCaseQuery) ||
+                item.category.toLowerCase().contains(lowerCaseQuery);
+          }).toList();
+        }
+      });
     }
   }
 
@@ -517,7 +1047,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Column(
             children: [
               _buildHeader(),
-              Expanded(child: _buildCategoryGrid()),
+              _buildStudyNowButton(),
+              Expanded(
+                child: _searchController.text.trim().isNotEmpty
+                    ? _buildSearchResults()
+                    : _buildCategoryGrid(),
+              ),
             ],
           ),
         ),
@@ -526,20 +1061,135 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildStudyNowButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      child: ElevatedButton.icon(
+        onPressed: _dueCardCount > 0 ? _startGlobalStudySession : null,
+        icon: const Icon(Icons.play_circle_fill_outlined),
+        label: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text('Study All Due Cards'),
+            const SizedBox(width: 8),
+            if (_dueCardCount > 0)
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: Colors.white,
+                child: Text(
+                  '$_dueCardCount',
+                  style: const TextStyle(
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              )
+          ],
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppTheme.primaryColor,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          disabledBackgroundColor: AppTheme.cardColor,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_searchResults.isEmpty) {
+      return Center(
+        child: Text(
+          'No results found for "${_searchController.text}"',
+          style: Theme.of(context).textTheme.bodyMedium,
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      itemCount: _searchResults.length,
+      itemBuilder: (context, index) {
+        final item = _searchResults[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: FlashcardWidget(
+            item: item,
+            onEdit: (updatedItem) async {
+              final allItems = await StorageService.loadItems();
+              final itemIndexInAll = allItems.indexWhere((i) => i.id == updatedItem.id);
+              if (itemIndexInAll != -1) {
+                allItems[itemIndexInAll] = updatedItem;
+                await StorageService.saveItems(allItems);
+                _loadItems();
+              }
+            },
+            onDelete: () async {
+              final allItems = await StorageService.loadItems();
+              allItems.removeWhere((i) => i.id == item.id);
+              await StorageService.saveItems(allItems);
+              _loadItems();
+            },
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          Text(
-            ' ABS FLASHCARDS',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 22,color:Colors.white),
+          Column(
+            children: [
+              Text(
+                ' ABS FLASHCARDS',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontSize: 22, color: Colors.white),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${_items.length} items in ${_categories.length} categories',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _searchController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Search all items...',
+                  hintStyle: const TextStyle(color: Colors.white70),
+                  prefixIcon: const Icon(Icons.search, color: Colors.white70),
+                  filled: true,
+                  fillColor: Colors.black.withOpacity(0.2),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white.withOpacity(0.3))),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppTheme.primaryColor)),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${_items.length} items in ${_categories.length} categories',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          Positioned(
+            top: -8,
+            right: -12,
+            child: IconButton(
+              icon: const Icon(Icons.bar_chart, color: Colors.white70),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => StatisticsScreen(items: _items)),
+                );
+              },
+            ),
+          )
         ],
       ),
     );
@@ -1044,7 +1694,12 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
             },
             child: _buildTextField(_answerController, 'Answer (Drop text here)', Icons.lightbulb_outline, maxLines: 5, isDragOver: _isDragOverAnswer),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          Text(
+            "Markdown formatting supported",
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+          ),
+          const SizedBox(height: 16),
           _buildActionButton('Create Card', Icons.add, () => _createFlashcard()),
         ],
       ),
@@ -1119,7 +1774,12 @@ class _MainControlsBottomSheetState extends State<MainControlsBottomSheet> with 
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          Text(
+            "Markdown formatting supported",
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+          ),
+          const SizedBox(height: 16),
 
           if (_pickedImage != null)
             Padding(
@@ -1410,7 +2070,7 @@ class _FlashcardScreenState extends State<FlashcardScreen> with TickerProviderSt
         children: [
           FloatingActionButton(heroTag: 'add_in_category', onPressed: _showAddCardDialog, backgroundColor: AppTheme.secondaryColor, mini: true, child: const Icon(Icons.add, color: Colors.white)),
           const SizedBox(height: 16),
-          FloatingActionButton(heroTag: 'practice', onPressed: () => _startPracticeMode(), backgroundColor: AppTheme.primaryColor, child: const Icon(Icons.play_arrow, color: Colors.white)),
+          FloatingActionButton(heroTag: 'practice', onPressed: _showStudyOptionsDialog, backgroundColor: AppTheme.primaryColor, child: const Icon(Icons.play_arrow, color: Colors.white)),
           const SizedBox(height: 16),
           FloatingActionButton(heroTag: 'shuffle', onPressed: () => _shuffleCards(), backgroundColor: AppTheme.primaryColor, child: const Icon(Icons.shuffle, color: Colors.white)),
         ],
@@ -1457,12 +2117,40 @@ class _FlashcardScreenState extends State<FlashcardScreen> with TickerProviderSt
   }
 
   void _startPracticeMode() {
-    final practiceCards = _items.where((item) => item.type == StudyItemType.card).toList();
-    if (practiceCards.isNotEmpty) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => PracticeScreen(items: practiceCards)));
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    final dueCards = _items.where((item) {
+      if (item.type != StudyItemType.card) return false;
+      final dueDate = item.dueDate;
+      final dueDay = DateTime(dueDate.year, dueDate.month, dueDate.day);
+      return dueDay.isBefore(today) || dueDay.isAtSameMomentAs(today);
+    }).toList();
+
+    if (dueCards.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => StudySessionScreen(
+            items: dueCards,
+            onSessionComplete: (updatedItems) async {
+              final allItems = await StorageService.loadItems();
+              for (var updatedItem in updatedItems) {
+                final index = allItems.indexWhere((i) => i.id == updatedItem.id);
+                if (index != -1) {
+                  allItems[index] = updatedItem;
+                }
+              }
+              await StorageService.saveItems(allItems);
+              _loadCategoryItems();
+              widget.onUpdate();
+            },
+          ),
+        ),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("There are no flashcards in this category to practice.")),
+        const SnackBar(content: Text("No cards are due for review in this category today!")),
       );
     }
   }
@@ -1487,6 +2175,44 @@ class _FlashcardScreenState extends State<FlashcardScreen> with TickerProviderSt
     await StorageService.saveItems(allItems);
     _loadCategoryItems();
     widget.onUpdate();
+  }
+
+  void _showStudyOptionsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Choose Study Mode', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'Would you like to study only the cards due for review (SRS), or practice all cards in this category (Cram)?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final allCards = _items.where((item) => item.type == StudyItemType.card).toList();
+              if (allCards.isNotEmpty) {
+                Navigator.push(context, MaterialPageRoute(builder: (context) => CramScreen(items: allCards)));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("There are no cards in this category to practice.")),
+                );
+              }
+            },
+            child: const Text('Practice All'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _startPracticeMode(); // This already contains the SRS "due cards" logic
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryColor),
+            child: const Text('Study Due', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -1637,10 +2363,13 @@ class _FlashcardWidgetState extends State<FlashcardWidget> with SingleTickerProv
                     Expanded(
                       child: Center(
                         child: SingleChildScrollView(
-                          child: Text(
-                            widget.item.question,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18),
-                            textAlign: TextAlign.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: MarkdownBody(
+                            data: widget.item.question,
+                            styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                              p: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18),
+                              textAlign: WrapAlignment.center,
+                            ),
                           ),
                         ),
                       ),
@@ -1678,10 +2407,18 @@ class _FlashcardWidgetState extends State<FlashcardWidget> with SingleTickerProv
           Expanded(
             child: Center(
               child: SingleChildScrollView(
-                child: Text(
-                  widget.item.answer,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18),
-                  textAlign: TextAlign.center,
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: MarkdownBody(
+                  data: widget.item.answer,
+                  styleSheet: MarkdownStyleSheet(
+                    p: Theme.of(context).textTheme.bodyLarge?.copyWith(fontSize: 18, color: Colors.white),
+                    h1: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.bold),
+                    h2: const TextStyle(fontSize: 22, color: Colors.white, fontWeight: FontWeight.bold),
+                    h3: const TextStyle(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold),
+                    code: TextStyle(backgroundColor: Colors.black.withOpacity(0.2), fontFamily: 'monospace', color: Colors.white),
+                    a: const TextStyle(color: AppTheme.secondaryColor, decoration: TextDecoration.underline),
+                    textAlign: WrapAlignment.center,
+                  ),
                 ),
               ),
             ),
@@ -1819,13 +2556,17 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                       color: Colors.white.withOpacity(0.95),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      widget.note.answer,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        height: 1.5,
-                        fontSize: 18,
-                        color: Colors.black87,
+                    child: MarkdownBody(
+                      data: widget.note.answer,
+                      styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context).copyWith(
+                        textTheme: Theme.of(context).textTheme.apply(
+                          bodyColor: Colors.black87,
+                          displayColor: Colors.black87,
+                        )
+                      )).copyWith(
+                        p: const TextStyle(fontSize: 16, height: 1.5),
                       ),
+                      selectable: true,
                     ),
                   ),
                 ]),
@@ -1963,7 +2704,12 @@ class _EditCardDialogState extends State<EditCardDialog> {
                       },
                       child: _buildTextField(answerController, widget.item.type == StudyItemType.note ? 'Content (Drop text here)' : 'Answer (Drop text here)', Icons.lightbulb_outline, maxLines: 5, isDragOver: _isDragOver),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Markdown formatting supported",
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -2004,18 +2750,20 @@ class _EditCardDialogState extends State<EditCardDialog> {
   }
 }
 
-// Practice Screen
-class PracticeScreen extends StatefulWidget {
+// Study Session Screen
+class StudySessionScreen extends StatefulWidget {
   final List<StudyItem> items;
+  final Function(List<StudyItem>) onSessionComplete;
 
-  const PracticeScreen({super.key, required this.items});
+  const StudySessionScreen({super.key, required this.items, required this.onSessionComplete});
 
   @override
-  State<PracticeScreen> createState() => _PracticeScreenState();
+  State<StudySessionScreen> createState() => _StudySessionScreenState();
 }
 
-class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStateMixin {
-  late List<StudyItem> _cards;
+class _StudySessionScreenState extends State<StudySessionScreen> with TickerProviderStateMixin {
+  late List<StudyItem> _sessionCards;
+  final List<StudyItem> _updatedCardsInSession = [];
   int _currentIndex = 0;
   bool _isFlipped = false;
   late AnimationController _flipController;
@@ -2026,7 +2774,8 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
-    _cards = List.from(widget.items)..shuffle();
+    // Cards are already filtered, no need to shuffle, we want to see them all
+    _sessionCards = List.from(widget.items);
     _flipController = AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
     _dragController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
     _cardOffset = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(CurvedAnimation(parent: _dragController, curve: Curves.easeOut));
@@ -2034,6 +2783,7 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
 
   @override
   void dispose() {
+    widget.onSessionComplete(_updatedCardsInSession);
     _flipController.dispose();
     _dragController.dispose();
     super.dispose();
@@ -2049,49 +2799,69 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
     }
   }
 
-  void _onDragUpdate(DragUpdateDetails details) {
+  void _reviewCard(ReviewQuality quality, {bool isSwipe = false}) {
+    if (!_isFlipped) return;
+
+    final currentItem = _sessionCards[_currentIndex];
+    final updatedItem = SpacedRepetitionSystem.schedule(currentItem, quality);
+    _updatedCardsInSession.add(updatedItem);
+
+    if (isSwipe) {
+      final screenWidth = MediaQuery.of(context).size.width;
+      final endOffset = _dragPosition.dx > 0
+          ? Offset(screenWidth * 1.2, _dragPosition.dy)
+          : Offset(-screenWidth * 1.2, _dragPosition.dy);
+      
+      _cardOffset = Tween<Offset>(begin: _dragPosition, end: endOffset)
+          .animate(CurvedAnimation(parent: _dragController, curve: Curves.easeIn));
+      _dragController.forward().then((_) => _nextCard());
+    } else {
+      _nextCard();
+    }
+  }
+
+  void _nextCard() {
+    if (_currentIndex < _sessionCards.length - 1) {
+      setState(() {
+        _currentIndex++;
+        _isFlipped = false;
+        _flipController.reset();
+        _dragController.reset();
+        _dragPosition = Offset.zero;
+        _cardOffset = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(_dragController);
+      });
+    } else {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Study session complete! Great work!"), duration: Duration(seconds: 3)),
+      );
+    }
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    // If the card isn't flipped, provide haptic feedback and do nothing else.
+    if (!_isFlipped) {
+      HapticFeedback.lightImpact(); // Provides a gentle vibration
+      return;
+    }
+
+    // If the card IS flipped, update the drag position as before.
     setState(() {
       _dragPosition += details.delta;
     });
   }
 
-  void _onDragEnd(DragEndDetails details) {
+  void _onPanEnd(DragEndDetails details) {
+    if (!_isFlipped) return;
     final screenWidth = MediaQuery.of(context).size.width;
-    if (_dragPosition.dx.abs() > screenWidth * 0.4 ||
-        details.velocity.pixelsPerSecond.dx.abs() > 500) {
-      final endOffset = _dragPosition.dx > 0
-          ? Offset(screenWidth * 1.2, _dragPosition.dy)
-          : Offset(-screenWidth * 1.2, _dragPosition.dy);
-
-      _cardOffset = Tween<Offset>(begin: _dragPosition, end: endOffset)
-          .animate(CurvedAnimation(parent: _dragController, curve: Curves.easeIn));
-      _dragController.forward().then((_) => _nextCard());
+    if (_dragPosition.dx.abs() > screenWidth * 0.4 || details.velocity.pixelsPerSecond.dx.abs() > 500) {
+      _reviewCard(ReviewQuality.good, isSwipe: true);
     } else {
-      // Animate back to center
       _cardOffset = Tween<Offset>(begin: _dragPosition, end: Offset.zero)
           .animate(CurvedAnimation(parent: _dragController, curve: Curves.easeOut));
       _dragController.forward(from: 0).whenComplete(() {
         if(mounted) setState(() => _dragPosition = Offset.zero);
       });
-    }
-  }
-
-  void _nextCard() {
-    if (_currentIndex < _cards.length - 1) {
-      setState(() {
-        _currentIndex++;
-        _isFlipped = false;
-        _dragPosition = Offset.zero;
-        _flipController.reset();
-        _dragController.reset();
-        _cardOffset = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
-            .animate(_dragController);
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("You've completed all cards!")),
-      );
-      Navigator.of(context).pop();
     }
   }
 
@@ -2116,10 +2886,10 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
                   padding: const EdgeInsets.all(24.0),
                   child: GestureDetector(
                     onTap: _flipCard,
-                    onPanUpdate: _onDragUpdate,
-                    onPanEnd: _onDragEnd,
+                    onPanUpdate: _onPanUpdate,
+                    onPanEnd: _onPanEnd,
                     child: AnimatedBuilder(
-                      animation: Listenable.merge([_dragController, _flipController]),
+                      animation: _dragController,
                       builder: (context, child) {
                         final cardPosition = _dragController.isAnimating
                             ? _cardOffset.value
@@ -2184,7 +2954,7 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
   }
 
   Widget _buildPracticeCardFace({required bool isFront}) {
-    final item = _cards[_currentIndex];
+    final item = _sessionCards[_currentIndex];
     final textContent = isFront ? item.question : item.answer;
 
     BoxDecoration decoration;
@@ -2235,7 +3005,7 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
             onPressed: () => Navigator.of(context).pop(),
           ),
           Text(
-            "Practice Mode",
+            "Study Session",
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(width: 48), // for balance
@@ -2250,13 +3020,13 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
       child: Column(
         children: [
           LinearProgressIndicator(
-            value: (_currentIndex + 1) / _cards.length,
+            value: (_currentIndex + 1) / _sessionCards.length,
             backgroundColor: AppTheme.cardColor,
             valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
           ),
           const SizedBox(height: 8),
           Text(
-            '${_currentIndex + 1} / ${_cards.length}',
+            '${_currentIndex + 1} / ${_sessionCards.length}',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
@@ -2265,21 +3035,59 @@ class _PracticeScreenState extends State<PracticeScreen> with TickerProviderStat
   }
 
   Widget _buildControls() {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          ElevatedButton(
+    if (!_isFlipped) {
+      return Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
             onPressed: _flipCard,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppTheme.secondaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text("Flip", style: TextStyle(color: Colors.white)),
+            child: const Text("Show Answer", style: TextStyle(color: Colors.white, fontSize: 16)),
+          ),
+        ),
+      );
+    }
+
+    // Show review quality buttons
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text("How well did you know this?", style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildReviewButton("Again", Colors.red.shade400, ReviewQuality.again),
+              _buildReviewButton("Hard", Colors.orange.shade400, ReviewQuality.hard),
+              _buildReviewButton("Good", AppTheme.primaryColor, ReviewQuality.good),
+              _buildReviewButton("Easy", Colors.green.shade400, ReviewQuality.easy),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildReviewButton(String label, Color color, ReviewQuality quality) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        child: ElevatedButton(
+          onPressed: () => _reviewCard(quality),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          child: Text(label, style: const TextStyle(color: Colors.white)),
+        ),
       ),
     );
   }
