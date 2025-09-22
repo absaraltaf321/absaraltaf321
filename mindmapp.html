@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -25,8 +26,8 @@
             --connector-default-color: #cbd5e1; /* Default grey */
             --node-bg-color: white; /* Default node background */
             --node-border-color: rgba(0, 0, 0, 0.1);
-            --node-text-color: var(--text);
-            --node-content-color: #000000;
+            --node-text-color: #708090;
+            --node-content-color: #708090;
             --modal-bg: white;
             --input-bg: white;
             --input-border: var(--border);
@@ -370,6 +371,71 @@
          /* Hidden connector color option */
          #change-connector-color-option { display: none; }
 
+        /* Color Swatches */
+        .color-swatches {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem; /* A bit more space */
+            align-items: center;
+            padding-top: 0.25rem;
+        }
+        .color-swatch {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid var(--border);
+            transition: transform 0.1s ease, border-color 0.2s ease;
+            outline-offset: 3px;
+        }
+        .color-swatch:hover {
+            transform: scale(1.1);
+            border-color: var(--text-muted);
+        }
+        .color-swatch.selected {
+            border-color: var(--primary);
+            transform: scale(1.15);
+            outline: 2px solid var(--primary);
+        }
+
+        /* Saved Maps List */
+        .saved-map-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            transition: background-color 0.2s ease;
+        }
+        .saved-map-item:hover {
+            background-color: var(--tree-hover-bg);
+        }
+        .saved-map-name {
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text);
+        }
+        .saved-map-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .btn-link {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 1rem;
+            padding: 0.25rem;
+        }
+        .btn-link:hover {
+            color: var(--primary);
+        }
+        .btn-link.danger:hover {
+            color: #ef4444;
+        }
+
 
         /* Controls */
         .controls {
@@ -538,13 +604,17 @@
             </button>
             
             <div class="toolbar-actions">
-                <button id="new-node-btn" class="btn btn-primary" title="Add Root Node">
+                <button id="new-map-btn" class="btn btn-primary" title="New Mind Map">
+                    <i class="fas fa-file"></i>
+                    <span>New</span>
+                </button>
+                <button id="new-node-btn" class="btn btn-secondary" title="Add Root Node">
                     <i class="fas fa-plus"></i>
                     <span>Add Root</span>
                 </button>
-                <button id="save-btn" class="btn btn-secondary" title="Save to File">
+                <button id="save-as-btn" class="btn btn-secondary" title="Save to Browser">
                     <i class="fas fa-save"></i>
-                    <span>Save</span>
+                    <span>Save As...</span>
                 </button>
                 <button id="load-btn" class="btn btn-secondary" title="Load from File">
                     <i class="fas fa-folder-open"></i>
@@ -589,6 +659,14 @@
                     <i class="fas fa-leaf"></i>
                     <span>Organic</span>
                 </button>
+            </div>
+            <div class="sidebar-title">Canvas Background</div>
+            <div id="background-colors" class="color-swatches" style="padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+                <!-- Swatches will be added here, maybe dynamically -->
+            </div>
+            <div class="sidebar-title">My Maps</div>
+            <div id="my-maps-list" style="padding-bottom: 1rem; margin-bottom: 1rem;">
+                <!-- Saved maps will be listed here -->
             </div>
             <div class="sidebar-title">Mind Map Structure</div>
             <div id="structure-tree"></div>
@@ -795,6 +873,19 @@
                      '#fed7aa', '#bef264', '#86efac', '#67e8f9',
                      '#a78bfa', '#f9a8d4'
                  ];
+                 this.backgroundColors = [
+                    { name: 'Default Light', color: '#f9fafb' },
+                    { name: 'Paper', color: '#f5f5f5' },
+                    { name: 'Light Blue', color: '#e0f2fe' },
+                    { name: 'Mint Green', color: '#dcfce7' },
+                    { name: 'Pale Yellow', color: '#fef9c3' },
+                    { name: 'Pastel Pink', color: '#fce7f3' },
+                    { name: 'Default Dark', color: '#1f2937' },
+                    { name: 'Charcoal', color: '#262626' },
+                    { name: 'Deep Purple', color: '#4a044e' },
+                    { name: 'Navy', color: '#172554' },
+                 ];
+                 this.canvasBgColor = null;
                  // Default connector color will be read from CSS vars dynamically
 
                 // DOM elements
@@ -814,6 +905,7 @@
                 this.nodeShapeSelect = document.getElementById('node-shape');
                 this.saveNodeBtn = document.getElementById('save-node');
                 this.cancelNodeBtn = document.getElementById('cancel-node');
+                this.newMapBtn = document.getElementById('new-map-btn');
                 this.newNodeBtn = document.getElementById('new-node-btn');
                 this.contextMenu = document.getElementById('context-menu');
                 this.addChildOption = document.getElementById('add-child-option');
@@ -829,7 +921,7 @@
                 this.centerViewBtn = document.getElementById('center-view');
                 this.fullscreenToggleBtn = document.getElementById('fullscreen-toggle');
                 this.themeToggleBtn = document.getElementById('theme-toggle');
-                this.saveBtn = document.getElementById('save-btn');
+                this.saveAsBtn = document.getElementById('save-as-btn');
                 this.loadBtn = document.getElementById('load-btn');
                 this.exportPdfBtn = document.getElementById('export-pdf-btn');
                 this.structureTree = document.getElementById('structure-tree');
@@ -870,9 +962,48 @@
                 this.init();
             }
 
+            populateColorSwatches() {
+                const container = document.getElementById('background-colors');
+                if (!container) return;
+                container.innerHTML = ''; // Clear existing swatches
+                this.backgroundColors.forEach(bg => {
+                    const swatch = document.createElement('div');
+                    swatch.className = 'color-swatch';
+                    swatch.dataset.color = bg.color;
+                    swatch.title = bg.name;
+                    swatch.style.backgroundColor = bg.color;
+                    container.appendChild(swatch);
+                });
+            }
+
+            populateMyMapsList() {
+                const container = document.getElementById('my-maps-list');
+                if (!container) return;
+                container.innerHTML = '';
+
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key.startsWith('mindmap-')) {
+                        const mapName = key.substring(8);
+                        const mapItem = document.createElement('div');
+                        mapItem.className = 'saved-map-item';
+                        mapItem.innerHTML = `
+                            <span class="saved-map-name">${mapName}</span>
+                            <div class="saved-map-actions">
+                                <button class="btn-link" data-action="load" data-key="${key}"><i class="fas fa-folder-open"></i></button>
+                                <button class="btn-link danger" data-action="delete" data-key="${key}"><i class="fas fa-trash"></i></button>
+                            </div>
+                        `;
+                        container.appendChild(mapItem);
+                    }
+                }
+            }
+
             // --- Initialization & Setup ---
             init() {
                 console.log("MindMap Initializing...");
+                this.populateColorSwatches();
+                this.populateMyMapsList();
                 this.setupEventListeners();
                 this.updateFullscreenIcon(); // Set initial fullscreen icon state
 
@@ -880,6 +1011,11 @@
 
                 // Apply loaded/initial theme (redundant with early script, but safe)
                 applyTheme(this.currentTheme);
+
+                // Apply loaded background color
+                if (this.canvasBgColor) {
+                    this.setCanvasBackground(this.canvasBgColor);
+                }
 
                 if (!loadedFromStorage || this.nodes.length === 0) {
                     if (!loadedFromStorage) {
@@ -990,6 +1126,7 @@
                 this.modalCloseBtn.addEventListener('click', () => this.closeModal());
 
                 // Toolbar Buttons
+                this.newMapBtn.addEventListener('click', () => this.startNewMap());
                 this.newNodeBtn.addEventListener('click', () => {
                     this.closeContextMenu();
                     this.contextMenuNodeId = null;
@@ -1002,12 +1139,23 @@
                     this.nodeTitleInput.value = ''; this.nodeContentInput.value = '';
                     this.openModal();
                 });
-                this.saveBtn.addEventListener('click', () => this.saveToFile());
+                this.saveAsBtn.addEventListener('click', () => this.saveAsToLocalStorage());
                 this.loadBtn.addEventListener('click', () => this.loadFromFile());
                 this.importExportBtn.addEventListener('click', () => this.openJsonModal());
                 this.exportPdfBtn.addEventListener('click', () => this.exportToPdf());
                 this.sidebarToggle.addEventListener('click', () => this.toggleSidebar());
                 this.themeToggleBtn.addEventListener('click', () => this.toggleTheme());
+
+                // Background Color Swatches
+                const bgColorsContainer = document.getElementById('background-colors');
+                if (bgColorsContainer) {
+                    bgColorsContainer.addEventListener('click', (e) => {
+                        const swatch = e.target.closest('.color-swatch');
+                        if (swatch && swatch.dataset.color) {
+                            this.setCanvasBackground(swatch.dataset.color);
+                        }
+                    });
+                }
 
                 // JSON Modal Listeners
                 this.loadFromJsonBtn.addEventListener('click', () => {
@@ -1028,6 +1176,24 @@
                 this.verticalTreeLayoutBtn.addEventListener('click', () => this.runLayout(this.applyVerticalTreeLayout));
                 this.radialLayoutBtn.addEventListener('click', () => this.runLayout(this.applyRadialLayout));
                 this.organicLayoutBtn.addEventListener('click', () => this.runLayout(this.applyOrganicMindMapLayout));
+
+                // My Maps List Actions
+                const myMapsContainer = document.getElementById('my-maps-list');
+                if (myMapsContainer) {
+                    myMapsContainer.addEventListener('click', (e) => {
+                        const target = e.target.closest('button');
+                        if (!target) return;
+
+                        const action = target.dataset.action;
+                        const key = target.dataset.key;
+
+                        if (action === 'load') {
+                            this.loadMapFromLocalStorage(key);
+                        } else if (action === 'delete') {
+                            this.deleteMapFromLocalStorage(key);
+                        }
+                    });
+                }
 
                 // Context Menu Options
                 this.addChildOption.addEventListener('click', () => {
@@ -1877,122 +2043,121 @@
             }
 
             applyOrganicMindMapLayout() {
-                console.log("Applying Organic Layout...");
-                const rootNodes = this.nodes.filter(n => this.getParentId(n.id) === null);
-                if (rootNodes.length === 0) {
-                    this.showToast("Organic layout requires at least one root node.", true);
-                    return;
-                }
+    console.log("Applying Organic Layout...");
+    const rootNodes = this.nodes.filter(n => this.getParentId(n.id) === null);
+    if (rootNodes.length === 0) {
+        this.showToast("Organic layout requires at least one root node.", true);
+        return;
+    }
 
-                const childrenMap = new Map();
-                this.nodes.forEach(n => childrenMap.set(n.id, []));
-                this.connections.forEach(c => childrenMap.has(c.from) && childrenMap.get(c.from).push(c.to));
-                const timeline = gsap.timeline({ onComplete: () => { this.updateConnections(); this.saveToLocalStorage(); this.centerView(true); } });
+    const childrenMap = new Map();
+    this.nodes.forEach(n => childrenMap.set(n.id, []));
+    this.connections.forEach(c => childrenMap.has(c.from) && childrenMap.get(c.from).push(c.to));
+    const timeline = gsap.timeline({ onComplete: () => { this.updateConnections(); this.saveToLocalStorage(); this.centerView(true); } });
 
-                // --- PASS 1: Measure subtree dimensions ---
-                const branchDimensions = new Map();
-                const calculateBranchDimensions = (nodeId) => {
-                    if (branchDimensions.has(nodeId)) return branchDimensions.get(nodeId);
-                    
-                    const element = this.getNodeElement(nodeId);
-                    const nodeWidth = element ? element.offsetWidth : 150;
-                    const nodeHeight = element ? element.offsetHeight : 50;
-                    const children = childrenMap.get(nodeId) || [];
+    // --- PASS 1: Measure subtree dimensions ---
+    const branchDimensions = new Map();
+    const calculateBranchDimensions = (nodeId) => {
+        if (branchDimensions.has(nodeId)) return branchDimensions.get(nodeId);
+        
+        const element = this.getNodeElement(nodeId);
+        const nodeWidth = element ? element.offsetWidth : 150;
+        const nodeHeight = element ? element.offsetHeight : 50;
+        const children = childrenMap.get(nodeId) || [];
 
-                    if (children.length === 0) {
-                        const dims = { width: nodeWidth, height: nodeHeight };
-                        branchDimensions.set(nodeId, dims);
-                        return dims;
-                    }
+        if (children.length === 0) {
+            const dims = { width: nodeWidth, height: nodeHeight };
+            branchDimensions.set(nodeId, dims);
+            return dims;
+        }
 
-                    let totalHeight = 0;
-                    let maxWidth = 0;
-                    const vPadding = 20;
-                    children.forEach(childId => {
-                        const childDims = calculateBranchDimensions(childId);
-                        totalHeight += childDims.height;
-                        maxWidth = Math.max(maxWidth, childDims.width);
-                    });
+        let totalHeight = 0;
+        let maxWidth = 0;
+        const vPadding = 20;
+        children.forEach(childId => {
+            const childDims = calculateBranchDimensions(childId);
+            totalHeight += childDims.height;
+            maxWidth = Math.max(maxWidth, childDims.width);
+        });
 
-                    const hPadding = 100;
-                    const finalWidth = nodeWidth + hPadding + maxWidth;
-                    const finalHeight = Math.max(nodeHeight, totalHeight + (children.length - 1) * vPadding);
-                    const dims = { width: finalWidth, height: finalHeight };
-                    branchDimensions.set(nodeId, dims);
-                    return dims;
-                };
-                this.nodes.forEach(n => { if (!branchDimensions.has(n.id)) calculateBranchDimensions(n.id); });
+        const hPadding = 100;
+        const finalWidth = nodeWidth + hPadding + maxWidth;
+        const finalHeight = Math.max(nodeHeight, totalHeight + (children.length - 1) * vPadding);
+        const dims = { width: finalWidth, height: finalHeight };
+        branchDimensions.set(nodeId, dims);
+        return dims;
+    };
+    this.nodes.forEach(n => { if (!branchDimensions.has(n.id)) calculateBranchDimensions(n.id); });
 
-                // --- PASS 2: Position nodes ---
-                const positionBranch = (nodes, parentX, parentY, direction) => {
-                    const vPadding = 40;
-                    let totalHeight = 0;
-                    nodes.forEach(nodeId => { totalHeight += branchDimensions.get(nodeId).height; });
-                    totalHeight += (nodes.length - 1) * vPadding;
+    // --- PASS 2: Position nodes ---
+    const positionBranch = (nodes, parentX, parentY, direction, distanceFromRoot = 0) => {
+        const vPadding = 40;
+        let totalHeight = 0;
+        nodes.forEach(nodeId => { totalHeight += branchDimensions.get(nodeId).height; });
+        totalHeight += (nodes.length - 1) * vPadding;
 
-                    let currentY = parentY - totalHeight / 2;
+        let currentY = parentY - totalHeight / 2;
 
-                    nodes.forEach(nodeId => {
-                        const node = this.getNodeById(nodeId);
-                        const dims = branchDimensions.get(nodeId);
-                        const element = this.getNodeElement(nodeId);
-                        const nodeWidth = element ? element.offsetWidth : 150;
-                        const hPadding = 150;
-                        const newX = parentX + (direction * (hPadding + (dims.width - nodeWidth)/2));
-                        const newY = currentY + dims.height / 2;
+        nodes.forEach(nodeId => {
+            const node = this.getNodeById(nodeId);
+            const dims = branchDimensions.get(nodeId);
+            const element = this.getNodeElement(nodeId);
+            const nodeWidth = element ? element.offsetWidth : 150;
+            const hPadding = Math.max(150, distanceFromRoot + 100);
+            const newX = parentX + (direction * (hPadding + (dims.width - nodeWidth)/2));
+            const newY = currentY + dims.height / 2;
 
-                        if (isFinite(newX) && isFinite(newY)) {
-                            timeline.to(node, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(node) }, "<");
-                            const children = childrenMap.get(nodeId) || [];
-                            positionBranch(children, newX, newY, direction);
-                        } else {
-                            console.error(`Invalid position calculated in Organic Layout for node ${node.id}:`, {newX, newY});
-                        }
-                        currentY += dims.height + vPadding;
-                    });
-                };
-
-                // --- Root positioning ---
-                let totalRootHeight = 0;
-                const rootVSpacing = 100;
-                rootNodes.forEach(root => totalRootHeight += branchDimensions.get(root.id).height);
-                totalRootHeight += (rootNodes.length - 1) * rootVSpacing;
-                let currentRootY = -totalRootHeight / 2;
-
-                rootNodes.forEach((root) => {
-                    const rootNode = this.getNodeById(root.id);
-                    const dims = branchDimensions.get(root.id);
-                    const newX = 0;
-                    const newY = currentRootY + dims.height / 2;
-                    timeline.to(rootNode, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(rootNode) }, "<");
-                    
-                    const children = childrenMap.get(root.id) || [];
-                    const rightBranch = children.slice(0, Math.ceil(children.length / 2));
-                    const leftBranch = children.slice(Math.ceil(children.length / 2));
-                    
-                    positionBranch(rightBranch, newX, newY, 1);
-                    positionBranch(leftBranch, newX, newY, -1);
-
-                    currentRootY += dims.height + rootVSpacing;
-                });
+            if (isFinite(newX) && isFinite(newY)) {
+                timeline.to(node, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(node) }, "<");
+                const children = childrenMap.get(nodeId) || [];
+                positionBranch(children, newX, newY, direction, distanceFromRoot + hPadding);
+            } else {
+                console.error(`Invalid position calculated in Organic Layout for node ${node.id}:`, {newX, newY});
             }
+            currentY += dims.height + vPadding;
+        });
+    };
 
+    // --- Root positioning ---
+    let totalRootHeight = 0;
+    const rootVSpacing = 1000;
+    rootNodes.forEach(root => totalRootHeight += branchDimensions.get(root.id).height);
+    totalRootHeight += (rootNodes.length - 1) * rootVSpacing;
+    let currentRootY = -totalRootHeight / 2;
 
-            selectNode(nodeId) {
-                 // Allow re-selecting the same node to bring it forward if needed, but don't log repeatedly
-                 if (this.selectedNodeId !== nodeId) {
-                     this.deselectNode(); // Deselect previous
-                     this.selectedNodeId = nodeId;
-                      // console.log(`Node selected: ID=${nodeId}`); // Keep logging minimal
-                 }
-                 const element = this.getNodeElement(nodeId);
-                 if (element) {
-                      element.classList.add('selected');
-                      // Optional: Bring selected node visually to front (if z-index issues arise)
-                      // this.canvas.appendChild(element);
-                 }
-                 this.updateStructureTree();
-            }
+    rootNodes.forEach((root) => {
+        const rootNode = this.getNodeById(root.id);
+        const dims = branchDimensions.get(root.id);
+        const newX = 0;
+        const newY = currentRootY + dims.height / 2;
+        timeline.to(rootNode, { x: newX, y: newY, duration: 0.4, ease: "power2.inOut", onUpdate: () => this.updateNodeElementPosition(rootNode) }, "<");
+        
+        const children = childrenMap.get(root.id) || [];
+        const rightBranch = children.slice(0, Math.ceil(children.length / 2));
+        const leftBranch = children.slice(Math.ceil(children.length / 2));
+        
+        positionBranch(rightBranch, newX, newY, 1, 0);
+        positionBranch(leftBranch, newX, newY, -1, 0);
+
+        currentRootY += dims.height + rootVSpacing;
+    });
+}
+
+selectNode(nodeId) {
+    // Allow re-selecting the same node to bring it forward if needed, but don't log repeatedly
+    if (this.selectedNodeId !== nodeId) {
+        this.deselectNode(); // Deselect previous
+        this.selectedNodeId = nodeId;
+         // console.log(`Node selected: ID=${nodeId}`); // Keep logging minimal
+    }
+    const element = this.getNodeElement(nodeId);
+    if (element) {
+         element.classList.add('selected');
+         // Optional: Bring selected node visually to front (if z-index issues arise)
+         // this.canvas.appendChild(element);
+    }
+    this.updateStructureTree();
+}
 
             deselectNode() {
                  if (this.selectedNodeId !== null) {
@@ -2636,7 +2801,8 @@
                          connections: this.connections,
                          nextId: this.nextId,
                          view: { offset: this.offset, scale: this.scale },
-                         theme: this.currentTheme // Save theme
+                         theme: this.currentTheme, // Save theme
+                         canvasBgColor: this.canvasBgColor // Save background color
                      };
                      localStorage.setItem('mindMapData', JSON.stringify(data));
                      // console.log("Saved to localStorage"); // Keep logging minimal
@@ -2645,6 +2811,29 @@
                      this.showToast('Could not save changes to local storage.', true);
                  }
              }
+
+            saveAsToLocalStorage() {
+                const mapName = prompt("Enter a name for your mind map:", "My Mind Map");
+                if (mapName) {
+                    try {
+                        const data = {
+                            nodes: this.getSanitizedNodes(),
+                            connections: this.connections,
+                            nextId: this.nextId,
+                            view: { offset: this.offset, scale: this.scale },
+                            theme: this.currentTheme,
+                            canvasBgColor: this.canvasBgColor
+                        };
+                        const key = `mindmap-${mapName}`;
+                        localStorage.setItem(key, JSON.stringify(data));
+                        this.showToast(`Mind map "${mapName}" saved!`);
+                        this.populateMyMapsList();
+                    } catch (error) {
+                        console.error('Error saving mind map to localStorage:', error);
+                        this.showToast('Error saving mind map!', true);
+                    }
+                }
+            }
 
              saveViewToLocalStorage() {
                   try {
@@ -2699,6 +2888,7 @@
                          this.connections = data.connections; // Includes potential colors
                          this.nextId = data.nextId;
                          this.currentTheme = data.theme === 'dark' ? 'dark' : 'light'; // Load theme
+                         this.canvasBgColor = data.canvasBgColor || null; // Load background color
 
                          if (data.view && data.view.offset && typeof data.view.scale === 'number') {
                              this.offset = data.view.offset;
@@ -2745,6 +2935,70 @@
                  }
                  return false; // No data or error
              }
+
+            loadMapFromLocalStorage(key) {
+                try {
+                    const savedData = localStorage.getItem(key);
+                    if (savedData) {
+                        const data = JSON.parse(savedData);
+                        if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.connections) || typeof data.nextId !== 'number') {
+                            throw new Error("Invalid mind map file format.");
+                        }
+
+                        this.clearMap(); // Clear current state
+
+                        // Load data
+                        this.nodes = data.nodes;
+                        this.connections = data.connections;
+                        this.nextId = data.nextId;
+                        this.currentTheme = data.theme === 'dark' ? 'dark' : 'light';
+                        this.canvasBgColor = data.canvasBgColor || null;
+                        
+                        applyTheme(this.currentTheme);
+                        if (this.canvasBgColor) {
+                           this.setCanvasBackground(this.canvasBgColor);
+                        }
+
+                        if (data.view && data.view.offset && typeof data.view.scale === 'number') {
+                            this.offset = data.view.offset;
+                            this.scale = data.view.scale;
+                        } else { this.offset = { x: 0, y: 0 }; this.scale = 1; }
+
+                        // Rebuild DOM
+                        this.nodes.forEach(nodeData => {
+                           const nodeElement = document.createElement('div');
+                           nodeElement.className = 'node';
+                           nodeElement.dataset.id = nodeData.id;
+                           this.updateNodeElementContent(nodeElement, nodeData);
+                           this.canvas.appendChild(nodeElement);
+                           this.applyNodeStyle(nodeData, nodeElement);
+                           this.updateNodeElementPosition(nodeData, nodeElement);
+                        });
+
+                        // Finalize UI
+                        this.buildRootNodeMap();
+                        this.updateCanvasTransform();
+                        this.updateConnections();
+                        this.updateStructureTree();
+                        requestAnimationFrame(() => this.centerView());
+
+                        const mapName = key.substring(8);
+                        this.showToast(`Loaded mind map "${mapName}"!`);
+                    }
+                } catch (error) {
+                    console.error('Error loading mind map from localStorage:', error);
+                    this.showToast(`Error loading map: ${error.message}`, true);
+                }
+            }
+
+            deleteMapFromLocalStorage(key) {
+                const mapName = key.substring(8);
+                if (confirm(`Are you sure you want to delete the mind map "${mapName}"?`)) {
+                    localStorage.removeItem(key);
+                    this.populateMyMapsList();
+                    this.showToast(`Mind map "${mapName}" deleted.`);
+                }
+            }
 
             clearMap() {
                  // console.log("Clearing map state."); // Keep logging minimal
@@ -2906,6 +3160,53 @@
                  }
                  return resultIds;
              }
+
+             setCanvasBackground(color) {
+                if (!color) return;
+                this.canvasBgColor = color;
+                this.htmlEl.style.setProperty('--canvas-bg', color);
+                
+                // Update selected state on swatches
+                const swatches = document.querySelectorAll('#background-colors .color-swatch');
+                swatches.forEach(swatch => {
+                    swatch.classList.toggle('selected', swatch.dataset.color === color);
+                });
+                
+                this.saveToLocalStorage(); // Persist the change
+             }
+
+             startNewMap() {
+                if (confirm('Are you sure you want to start a new mind map? Your current unsaved changes will be lost.')) {
+                    this.clearMap();
+                    // We don't remove the whole localStorage key anymore, just reset the state
+                    
+                    // Re-initialize the view
+                    this.offset = { x: 0, y: 0 };
+                    this.scale = 1;
+                    this.updateCanvasTransform();
+
+                    // Create a fresh root node
+                     const initialX = this.canvasContainer.offsetWidth / 2;
+                     const initialY = this.canvasContainer.offsetHeight / 3;
+                     const initialNode = {
+                         id: this.getNextId(),
+                         title: 'Main Topic',
+                         content: 'Start your new mind map!',
+                         x: 0, y: 0,
+                         parentId: null,
+                         color: getComputedStyle(this.htmlEl).getPropertyValue('--node-bg-color').trim() || '#ffffff',
+                         shape: 'rounded-rectangle'
+                     };
+                     this.addNode(initialNode);
+                     this.offset.x = initialX; // Center horizontally
+                     this.offset.y = initialY; // Position vertically
+                     this.updateCanvasTransform();
+                     this.centerView(true); // Animate to center
+                     
+                     this.saveToLocalStorage(); // Save the new blank state
+                     this.showToast('New mind map started.');
+                }
+            }
 
              // --- Theme Toggle ---
              toggleTheme() {
