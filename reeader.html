@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1150,6 +1151,7 @@
         class MarkdownReader {
             constructor() {
                 this.idbStore = new IDBStorage();
+                this.epubFontOverrideStyle = null;
                 this.state = {
                     currentFile: null,
                     files: new Map(),
@@ -1565,11 +1567,17 @@
                 
                 this.elements.fileSelectInMenu.value = filename;
 
+                // Clean up styles from any previously loaded EPUB
+                const epubStyles = document.getElementById('epub-styles');
+                if (epubStyles) epubStyles.remove();
+
                 if (file.type === 'epub') {
                     await this.loadEpub(file);
                 } else {
                     await this.loadMarkdown(file);
                 }
+                
+                this.applySettings();
             }
 
             async loadMarkdown(file) {
@@ -2448,7 +2456,30 @@
                             lora: 'var(--font-lora)', roboto: 'var(--font-roboto)', lato: 'var(--font-lato)',
                             inconsolata: 'var(--font-inconsolata)'
                         };
-                        rootStyle.setProperty('--reading-font-family', fontMap[value]);
+                        const selectedFont = fontMap[value] || 'var(--font-reading)';
+                        rootStyle.setProperty('--reading-font-family', selectedFont);
+
+                        const file = this.state.currentFile && this.state.files.get(this.state.currentFile);
+
+                        if (file && file.type === 'epub') {
+                            if (!this.epubFontOverrideStyle) {
+                                this.epubFontOverrideStyle = document.createElement('style');
+                                this.epubFontOverrideStyle.id = 'epub-font-override';
+                                document.head.appendChild(this.epubFontOverrideStyle);
+                            }
+                            // Apply font to all elements within the EPUB container
+                            this.epubFontOverrideStyle.textContent = `
+                                #epub-content * {
+                                    font-family: ${selectedFont} !important;
+                                }
+                            `;
+                        } else {
+                            // If not an epub, or no file loaded, remove the override
+                            if (this.epubFontOverrideStyle) {
+                                this.epubFontOverrideStyle.remove();
+                                this.epubFontOverrideStyle = null;
+                            }
+                        }
                     },
                     'glassMorphism': () => document.body.classList.toggle('glass-morphism-active', value),
                     'lightStyle': () => {
